@@ -1,0 +1,30 @@
+{
+  "project_info": {
+    "project_number": "262801178263",
+    "firebase_url": "https://presence-app-735f3-default-rtdb.asia-southeast1.firebasedatabase.app",
+    "project_id": "presence-app-735f3",
+    "storage_bucket": "presence-app-735f3.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:262801178263:android:1cb6002da0f70dc3d8f3d2",
+        "android_client_info": {
+          "package_name": "com.example.presence"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAv9qmT3yKZ6cUhOWI3zMJIQv3LNOXE6iE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
