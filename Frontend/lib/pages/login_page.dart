@@ -2,6 +2,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import 'loading_page.dart';
 import 'register_page.dart';
 import 'package:presence/components/dialog/forgot_password_dialog.dart';
 import 'home.dart';
@@ -33,7 +34,11 @@ class _LoginPageState extends State<LoginPage> {
 
     if (usernameError != null || passwordError != null) return;
 
-    setState(() => isLoading = true);
+    // ✅ Tampilkan loading page dulu
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const LoadingPage()),
+    );
 
     try {
       final query = await FirebaseFirestore.instance
@@ -43,6 +48,7 @@ class _LoginPageState extends State<LoginPage> {
           .get();
 
       if (query.docs.isEmpty) {
+        Navigator.pop(context); // Kembali dari LoadingPage
         setState(() => usernameError = "Username tidak ditemukan");
         return;
       }
@@ -55,33 +61,43 @@ class _LoginPageState extends State<LoginPage> {
         password: password,
       );
 
-      Navigator.pushReplacement(
+      // ✅ Beri delay biar animasi sempat terlihat
+      await Future.delayed(const Duration(seconds: 2));
+
+      Navigator.pushAndRemoveUntil(
         context,
         MaterialPageRoute(builder: (_) => const HomePage()),
+        (route) => false,
       );
     } on FirebaseAuthException catch (e) {
+      Navigator.pop(context); // Kembali dari LoadingPage
+
       if (e.code == 'wrong-password') {
         setState(() => passwordError = "Password salah");
       } else {
         setState(() => passwordError = e.message ?? "Login gagal");
       }
     } catch (e) {
+      Navigator.pop(context); // Kembali dari LoadingPage
       setState(() => passwordError = "Terjadi kesalahan: ${e.toString()}");
-    } finally {
-      setState(() => isLoading = false);
     }
   }
 
   Future<void> loginWithGoogle() async {
-    setState(() => isLoading = true);
+    // Tampilkan loading page sebelum proses login
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const LoadingPage()),
+    );
+
     try {
       final googleSignIn = GoogleSignIn();
 
-      await googleSignIn.signOut();
+      await googleSignIn.signOut(); // logout akun sebelumnya
 
       final GoogleSignInAccount? googleUser = await googleSignIn.signIn();
       if (googleUser == null) {
-        setState(() => isLoading = false);
+        Navigator.pop(context); // kembali dari loading page
         return;
       }
 
@@ -95,20 +111,18 @@ class _LoginPageState extends State<LoginPage> {
 
       await FirebaseAuth.instance.signInWithCredential(credential);
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Login Google berhasil")),
-      );
-
-      Navigator.pushReplacement(
+      // Arahkan ke halaman utama
+      Navigator.pushAndRemoveUntil(
         context,
         MaterialPageRoute(builder: (_) => const HomePage()),
+        (route) => false,
       );
     } catch (e) {
+      Navigator.pop(context); // kembali dari loading page
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text("Login Google gagal: ${e.toString()}")),
       );
-    } finally {
-      setState(() => isLoading = false);
     }
   }
 
@@ -127,8 +141,7 @@ class _LoginPageState extends State<LoginPage> {
           child: SingleChildScrollView(
             child: Container(
               margin: const EdgeInsets.all(24),
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(24),
@@ -167,9 +180,7 @@ class _LoginPageState extends State<LoginPage> {
                       prefixIcon: const Icon(Icons.lock_outline),
                       suffixIcon: IconButton(
                         icon: Icon(
-                          isObscured
-                              ? Icons.visibility_off
-                              : Icons.visibility,
+                          isObscured ? Icons.visibility_off : Icons.visibility,
                         ),
                         onPressed: () {
                           setState(() {
@@ -216,9 +227,7 @@ class _LoginPageState extends State<LoginPage> {
                         ),
                       ),
                       child: isLoading
-                          ? const CircularProgressIndicator(
-                              color: Colors.white,
-                            )
+                          ? const CircularProgressIndicator(color: Colors.white)
                           : const Text(
                               "Sign In",
                               style: TextStyle(color: Colors.white),
@@ -264,7 +273,8 @@ class _LoginPageState extends State<LoginPage> {
                           Navigator.push(
                             context,
                             MaterialPageRoute(
-                                builder: (_) => const RegisterPage()),
+                              builder: (_) => const RegisterPage(),
+                            ),
                           );
                         },
                         child: const Text(
