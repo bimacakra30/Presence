@@ -1,4 +1,5 @@
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'login_page.dart';
@@ -18,30 +19,40 @@ class _RegisterPageState extends State<RegisterPage> {
   bool isLoading = false;
   bool isPasswordVisible = false;
 
-  Future<void> register() async {
-    setState(() => isLoading = true);
-    try {
-      await FirebaseAuth.instance.createUserWithEmailAndPassword(
-        email: emailController.text.trim(),
-        password: passwordController.text.trim(),
-      );
+Future<void> register() async {
+  setState(() => isLoading = true);
+  try {
+    final userCredential = await FirebaseAuth.instance.createUserWithEmailAndPassword(
+      email: emailController.text.trim(),
+      password: passwordController.text.trim(),
+    );
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Akun berhasil dibuat!")),
-      );
+    // Simpan username ke Firestore
+    await FirebaseFirestore.instance
+        .collection('users')
+        .doc(userCredential.user!.uid)
+        .set({
+      'username': usernameController.text.trim(),
+      'email': emailController.text.trim(),
+      'createdAt': Timestamp.now(),
+    });
 
-      Navigator.pushReplacement(
-        context,
-        createFadeSlideRoute(const LoginPage()),
-      );
-    } on FirebaseAuthException catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.message ?? "Registrasi gagal")),
-      );
-    } finally {
-      setState(() => isLoading = false);
-    }
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text("Akun berhasil dibuat!")),
+    );
+
+    Navigator.pushReplacement(
+      context,
+      createFadeSlideRoute(const LoginPage()),
+    );
+  } on FirebaseAuthException catch (e) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(e.message ?? "Registrasi gagal")),
+    );
+  } finally {
+    setState(() => isLoading = false);
   }
+}
 
 Future<void> registerWithGoogle() async {
   setState(() => isLoading = true);

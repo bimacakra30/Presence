@@ -1,10 +1,10 @@
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'register_page.dart';
 import 'package:presence/utils/page_transition.dart';
 import 'home.dart';
-
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -22,70 +22,91 @@ class _LoginPageState extends State<LoginPage> {
   Future<void> login() async {
     setState(() => isLoading = true);
     try {
+      final username = emailController.text.trim();
+      final password = passwordController.text.trim();
+
+      // Cari email dari username
+      final query = await FirebaseFirestore.instance
+          .collection('users')
+          .where('username', isEqualTo: username)
+          .limit(1)
+          .get();
+
+      if (query.docs.isEmpty) {
+        throw FirebaseAuthException(
+          code: 'user-not-found',
+          message: 'Username tidak ditemukan',
+        );
+      }
+
+      final userDoc = query.docs.first;
+      final email = userDoc['email'];
+
+      // Lanjut login pakai email
       await FirebaseAuth.instance.signInWithEmailAndPassword(
-        email: emailController.text.trim(),
-        password: passwordController.text.trim(),
+        email: email,
+        password: password,
       );
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Login berhasil")),
-      );
-
-      // Navigasi ke HomePage setelah login berhasil
-      Navigator.pushAndRemoveUntil(
+      ScaffoldMessenger.of(
         context,
-        MaterialPageRoute(builder: (context) => const HomePage()),
-        (route) => false,
+      ).showSnackBar(const SnackBar(content: Text("Login berhasil")));
+
+      Navigator.pushReplacement(
+        context,
+        createFadeSlideRoute(const HomePage()),
       );
-    } on FirebaseAuthException catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.message ?? "Login gagal")),
-      );
+    } catch (e, stackTrace) {
+      print('Login error: $e');
+      print('Stack trace: $stackTrace');
+
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text("Error: ${e.toString()}")));
     } finally {
       setState(() => isLoading = false);
     }
   }
 
-Future<void> loginWithGoogle() async {
-  setState(() => isLoading = true);
-  try {
-    final googleSignIn = GoogleSignIn();
+  Future<void> loginWithGoogle() async {
+    setState(() => isLoading = true);
+    try {
+      final googleSignIn = GoogleSignIn();
 
-    await googleSignIn.signOut();
+      await googleSignIn.signOut();
 
-    final GoogleSignInAccount? googleUser = await googleSignIn.signIn();
-    if (googleUser == null) {
+      final GoogleSignInAccount? googleUser = await googleSignIn.signIn();
+      if (googleUser == null) {
+        setState(() => isLoading = false);
+        return;
+      }
+
+      final GoogleSignInAuthentication googleAuth =
+          await googleUser.authentication;
+
+      final credential = GoogleAuthProvider.credential(
+        accessToken: googleAuth.accessToken,
+        idToken: googleAuth.idToken,
+      );
+
+      await FirebaseAuth.instance.signInWithCredential(credential);
+
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text("Login Google berhasil")));
+
+      Navigator.pushReplacement(
+        context,
+        createFadeSlideRoute(const HomePage()),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Login Google gagal: ${e.toString()}")),
+      );
+    } finally {
       setState(() => isLoading = false);
-      return;
     }
-
-    final GoogleSignInAuthentication googleAuth =
-        await googleUser.authentication;
-
-    final credential = GoogleAuthProvider.credential(
-      accessToken: googleAuth.accessToken,
-      idToken: googleAuth.idToken,
-    );
-
-    await FirebaseAuth.instance.signInWithCredential(credential);
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text("Login Google berhasil")),
-    );
-
-    Navigator.pushReplacement(
-      context,
-      createFadeSlideRoute(const HomePage()),
-    );
-  } catch (e) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text("Login Google gagal: ${e.toString()}")),
-    );
-  } finally {
-    setState(() => isLoading = false);
   }
-}
-
 
   @override
   Widget build(BuildContext context) {
@@ -114,7 +135,7 @@ Future<void> loginWithGoogle() async {
                     color: Colors.black.withOpacity(0.1),
                     blurRadius: 12,
                     offset: const Offset(0, 8),
-                  )
+                  ),
                 ],
               ),
               child: Column(
@@ -122,10 +143,7 @@ Future<void> loginWithGoogle() async {
                 children: [
                   const Text(
                     'Sign In',
-                    style: TextStyle(
-                      fontSize: 26,
-                      fontWeight: FontWeight.bold,
-                    ),
+                    style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 24),
 
@@ -168,9 +186,18 @@ Future<void> loginWithGoogle() async {
                     alignment: Alignment.centerRight,
                     child: TextButton(
                       onPressed: () {
-                        // TODO: Forgot password
+                        showDialog(
+                          context: context,
+                          builder: (_) => const ForgotPasswordDialog(),
+                        );
                       },
-                      child: const Text("Forgot Password?"),
+                      child: const Text(
+                        "Forgot Password?",
+                        style: TextStyle(
+                          color: Colors.blue,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
                     ),
                   ),
 
@@ -258,3 +285,68 @@ Future<void> loginWithGoogle() async {
     );
   }
 }
+
+class ForgotPasswordDialog extends StatefulWidget {
+  const ForgotPasswordDialog({super.key});
+
+  @override
+  State<ForgotPasswordDialog> createState() => _ForgotPasswordDialogState();
+}
+
+class _ForgotPasswordDialogState extends State<ForgotPasswordDialog> {
+  final emailController = TextEditingController();
+  bool isSending = false;
+
+  Future<void> sendResetEmail() async {
+    final email = emailController.text.trim();
+    if (email.isEmpty) return;
+
+    setState(() => isSending = true);
+
+    try {
+      await FirebaseAuth.instance.sendPasswordResetEmail(email: email);
+      Navigator.pop(context);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Link reset password telah dikirim!")),
+      );
+    } on FirebaseAuthException catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.message ?? "Gagal mengirim reset password")),
+      );
+    } finally {
+      setState(() => isSending = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text("Reset Password"),
+      content: TextField(
+        controller: emailController,
+        decoration: const InputDecoration(
+          labelText: "Masukkan email akunmu",
+          prefixIcon: Icon(Icons.email_outlined),
+        ),
+        keyboardType: TextInputType.emailAddress,
+      ),
+      actions: [
+        TextButton(
+          onPressed: isSending ? null : () => Navigator.pop(context),
+          child: const Text("Batal"),
+        ),
+        ElevatedButton(
+          onPressed: isSending ? null : sendResetEmail,
+          child: isSending
+              ? const SizedBox(
+                  height: 20,
+                  width: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Text("Kirim"),
+        ),
+      ],
+    );
+  }
+}
+
