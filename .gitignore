@@ -38,6 +38,27 @@ linux/
 macos/
 windows/
 
+# Native build and CMake
+.cxx/
+**/build/
+**/CMakeFiles/
+**/CMakeCache.txt
+**/cmake_install.cmake
+**/*.ninja
+
+# Android SDK / Gradle Wrapper
+.gradle/
+android/gradlew
+android/gradlew.bat
+android/gradle-wrapper.jar
+
+# VS Code (boleh diabaikan kalau tidak perlu version control config IDE)
+.vscode/
+
+# Key and Keystore
+key.properties
+**/*.jks
+**/*.keystore
 
 # Symbolication related
 app.*.symbols
