@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'register_page.dart';
+import 'package:presence/components/dialog/forgot_password_dialog.dart';
 import 'home.dart';
 
 class LoginPage extends StatefulWidget {
@@ -18,13 +19,23 @@ class _LoginPageState extends State<LoginPage> {
   bool isLoading = false;
   bool isObscured = true;
 
-  Future<void> login() async {
-    setState(() => isLoading = true);
-    try {
-      final username = emailController.text.trim();
-      final password = passwordController.text.trim();
+  String? usernameError;
+  String? passwordError;
 
-      // Cari email dari username
+  Future<void> login() async {
+    final username = emailController.text.trim();
+    final password = passwordController.text.trim();
+
+    setState(() {
+      usernameError = username.isEmpty ? 'Username wajib diisi' : null;
+      passwordError = password.isEmpty ? 'Password wajib diisi' : null;
+    });
+
+    if (usernameError != null || passwordError != null) return;
+
+    setState(() => isLoading = true);
+
+    try {
       final query = await FirebaseFirestore.instance
           .collection('users')
           .where('username', isEqualTo: username)
@@ -32,35 +43,30 @@ class _LoginPageState extends State<LoginPage> {
           .get();
 
       if (query.docs.isEmpty) {
-        throw FirebaseAuthException(
-          code: 'user-not-found',
-          message: 'Username tidak ditemukan',
-        );
+        setState(() => usernameError = "Username tidak ditemukan");
+        return;
       }
 
       final userDoc = query.docs.first;
       final email = userDoc['email'];
 
-      // Lanjut login pakai email
       await FirebaseAuth.instance.signInWithEmailAndPassword(
         email: email,
         password: password,
       );
 
-      ScaffoldMessenger.of(
+      Navigator.pushReplacement(
         context,
-      ).showSnackBar(const SnackBar(content: Text("Login berhasil")));
-
-      Navigator.push(
-        context,
-        MaterialPageRoute(builder: (_) => const HomePage()));
-    } catch (e, stackTrace) {
-      print('Login error: $e');
-      print('Stack trace: $stackTrace');
-
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text("Error: ${e.toString()}")));
+        MaterialPageRoute(builder: (_) => const HomePage()),
+      );
+    } on FirebaseAuthException catch (e) {
+      if (e.code == 'wrong-password') {
+        setState(() => passwordError = "Password salah");
+      } else {
+        setState(() => passwordError = e.message ?? "Login gagal");
+      }
+    } catch (e) {
+      setState(() => passwordError = "Terjadi kesalahan: ${e.toString()}");
     } finally {
       setState(() => isLoading = false);
     }
@@ -89,13 +95,14 @@ class _LoginPageState extends State<LoginPage> {
 
       await FirebaseAuth.instance.signInWithCredential(credential);
 
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text("Login Google berhasil")));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Login Google berhasil")),
+      );
 
-      Navigator.push(
-        context, 
-        MaterialPageRoute(builder: (_) => const HomePage()));
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => const HomePage()),
+      );
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text("Login Google gagal: ${e.toString()}")),
@@ -111,10 +118,7 @@ class _LoginPageState extends State<LoginPage> {
       body: Container(
         decoration: const BoxDecoration(
           gradient: LinearGradient(
-            colors: [
-              Color(0xFF006989), // Warna pertama (dibalik)
-              Color(0xFFA3BAC3), // Warna kedua (dibalik)
-            ],
+            colors: [Color(0xFF006989), Color(0xFFA3BAC3)],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
@@ -123,7 +127,8 @@ class _LoginPageState extends State<LoginPage> {
           child: SingleChildScrollView(
             child: Container(
               margin: const EdgeInsets.all(24),
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(24),
@@ -143,19 +148,18 @@ class _LoginPageState extends State<LoginPage> {
                     style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 24),
-
                   TextField(
                     controller: emailController,
                     decoration: InputDecoration(
                       prefixIcon: const Icon(Icons.person_outline),
                       hintText: "Username",
+                      errorText: usernameError,
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
                     ),
                   ),
                   const SizedBox(height: 16),
-
                   TextField(
                     controller: passwordController,
                     obscureText: isObscured,
@@ -163,7 +167,9 @@ class _LoginPageState extends State<LoginPage> {
                       prefixIcon: const Icon(Icons.lock_outline),
                       suffixIcon: IconButton(
                         icon: Icon(
-                          isObscured ? Icons.visibility_off : Icons.visibility,
+                          isObscured
+                              ? Icons.visibility_off
+                              : Icons.visibility,
                         ),
                         onPressed: () {
                           setState(() {
@@ -172,12 +178,12 @@ class _LoginPageState extends State<LoginPage> {
                         },
                       ),
                       hintText: "Password",
+                      errorText: passwordError,
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
                     ),
                   ),
-
                   const SizedBox(height: 8),
                   Align(
                     alignment: Alignment.centerRight,
@@ -185,7 +191,7 @@ class _LoginPageState extends State<LoginPage> {
                       onPressed: () {
                         showDialog(
                           context: context,
-                          builder: (_) => const ForgotPasswordDialog(),
+                          builder: (context) => const ForgotPasswordDialog(),
                         );
                       },
                       child: const Text(
@@ -197,7 +203,6 @@ class _LoginPageState extends State<LoginPage> {
                       ),
                     ),
                   ),
-
                   const SizedBox(height: 12),
                   SizedBox(
                     width: double.infinity,
@@ -211,14 +216,15 @@ class _LoginPageState extends State<LoginPage> {
                         ),
                       ),
                       child: isLoading
-                          ? const CircularProgressIndicator(color: Colors.white)
+                          ? const CircularProgressIndicator(
+                              color: Colors.white,
+                            )
                           : const Text(
                               "Sign In",
                               style: TextStyle(color: Colors.white),
                             ),
                     ),
                   ),
-
                   const SizedBox(height: 16),
                   Row(
                     children: const [
@@ -231,7 +237,6 @@ class _LoginPageState extends State<LoginPage> {
                     ],
                   ),
                   const SizedBox(height: 16),
-
                   SizedBox(
                     width: double.infinity,
                     child: OutlinedButton.icon(
@@ -249,7 +254,6 @@ class _LoginPageState extends State<LoginPage> {
                       ),
                     ),
                   ),
-
                   const SizedBox(height: 16),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
@@ -259,7 +263,9 @@ class _LoginPageState extends State<LoginPage> {
                         onTap: () {
                           Navigator.push(
                             context,
-                            MaterialPageRoute(builder: (_) => const RegisterPage()));
+                            MaterialPageRoute(
+                                builder: (_) => const RegisterPage()),
+                          );
                         },
                         child: const Text(
                           "Sign Up",
@@ -281,68 +287,3 @@ class _LoginPageState extends State<LoginPage> {
     );
   }
 }
-
-class ForgotPasswordDialog extends StatefulWidget {
-  const ForgotPasswordDialog({super.key});
-
-  @override
-  State<ForgotPasswordDialog> createState() => _ForgotPasswordDialogState();
-}
-
-class _ForgotPasswordDialogState extends State<ForgotPasswordDialog> {
-  final emailController = TextEditingController();
-  bool isSending = false;
-
-  Future<void> sendResetEmail() async {
-    final email = emailController.text.trim();
-    if (email.isEmpty) return;
-
-    setState(() => isSending = true);
-
-    try {
-      await FirebaseAuth.instance.sendPasswordResetEmail(email: email);
-      Navigator.pop(context);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Link reset password telah dikirim!")),
-      );
-    } on FirebaseAuthException catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.message ?? "Gagal mengirim reset password")),
-      );
-    } finally {
-      setState(() => isSending = false);
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AlertDialog(
-      title: const Text("Reset Password"),
-      content: TextField(
-        controller: emailController,
-        decoration: const InputDecoration(
-          labelText: "Masukkan email akunmu",
-          prefixIcon: Icon(Icons.email_outlined),
-        ),
-        keyboardType: TextInputType.emailAddress,
-      ),
-      actions: [
-        TextButton(
-          onPressed: isSending ? null : () => Navigator.pop(context),
-          child: const Text("Batal"),
-        ),
-        ElevatedButton(
-          onPressed: isSending ? null : sendResetEmail,
-          child: isSending
-              ? const SizedBox(
-                  height: 20,
-                  width: 20,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
-              : const Text("Kirim"),
-        ),
-      ],
-    );
-  }
-}
-

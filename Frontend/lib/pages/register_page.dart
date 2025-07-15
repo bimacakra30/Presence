@@ -15,80 +15,99 @@ class _RegisterPageState extends State<RegisterPage> {
   final usernameController = TextEditingController();
   final emailController = TextEditingController();
   final passwordController = TextEditingController();
+
   bool isLoading = false;
   bool isPasswordVisible = false;
 
-Future<void> register() async {
-  setState(() => isLoading = true);
-  try {
-    final userCredential = await FirebaseAuth.instance.createUserWithEmailAndPassword(
-      email: emailController.text.trim(),
-      password: passwordController.text.trim(),
-    );
+  String? usernameError;
+  String? emailError;
+  String? passwordError;
 
-    // Simpan username ke Firestore
-    await FirebaseFirestore.instance
-        .collection('users')
-        .doc(userCredential.user!.uid)
-        .set({
-      'username': usernameController.text.trim(),
-      'email': emailController.text.trim(),
-      'createdAt': Timestamp.now(),
+  Future<void> register() async {
+    setState(() {
+      usernameError =
+          usernameController.text.trim().isEmpty ? "Username wajib diisi" : null;
+      emailError =
+          emailController.text.trim().isEmpty ? "Email wajib diisi" : null;
+      passwordError =
+          passwordController.text.trim().isEmpty ? "Password wajib diisi" : null;
     });
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text("Akun berhasil dibuat!")),
-    );
-
-    Navigator.push(
-      context, 
-      MaterialPageRoute(builder: (_) => const LoginPage()));
-  } on FirebaseAuthException catch (e) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(e.message ?? "Registrasi gagal")),
-    );
-  } finally {
-    setState(() => isLoading = false);
-  }
-}
-
-Future<void> registerWithGoogle() async {
-  setState(() => isLoading = true);
-  try {
-    final googleSignIn = GoogleSignIn();
-
-    // Tambahkan ini untuk memastikan logout akun sebelumnya
-    await googleSignIn.signOut();
-
-    final GoogleSignInAccount? googleUser = await googleSignIn.signIn();
-    if (googleUser == null) {
-      setState(() => isLoading = false);
+    if (usernameError != null || emailError != null || passwordError != null) {
       return;
     }
 
-    final GoogleSignInAuthentication googleAuth =
-        await googleUser.authentication;
+    setState(() => isLoading = true);
 
-    final credential = GoogleAuthProvider.credential(
-      accessToken: googleAuth.accessToken,
-      idToken: googleAuth.idToken,
-    );
+    try {
+      final userCredential = await FirebaseAuth.instance
+          .createUserWithEmailAndPassword(
+        email: emailController.text.trim(),
+        password: passwordController.text.trim(),
+      );
 
-    await FirebaseAuth.instance.signInWithCredential(credential);
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(userCredential.user!.uid)
+          .set({
+        'username': usernameController.text.trim(),
+        'email': emailController.text.trim(),
+        'createdAt': Timestamp.now(),
+      });
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text("Pendaftaran dengan Google berhasil")),
-    );
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Akun berhasil dibuat!")),
+      );
 
-    // TODO: Arahkan ke halaman utama setelah sukses login
-  } catch (e) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text("Registrasi Google gagal: ${e.toString()}")),
-    );
-  } finally {
-    setState(() => isLoading = false);
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => const LoginPage()),
+      );
+    } on FirebaseAuthException catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.message ?? "Registrasi gagal")),
+      );
+    } finally {
+      setState(() => isLoading = false);
+    }
   }
-}
+
+  Future<void> registerWithGoogle() async {
+    setState(() => isLoading = true);
+    try {
+      final googleSignIn = GoogleSignIn();
+
+      await googleSignIn.signOut();
+
+      final GoogleSignInAccount? googleUser = await googleSignIn.signIn();
+      if (googleUser == null) {
+        setState(() => isLoading = false);
+        return;
+      }
+
+      final GoogleSignInAuthentication googleAuth =
+          await googleUser.authentication;
+
+      final credential = GoogleAuthProvider.credential(
+        accessToken: googleAuth.accessToken,
+        idToken: googleAuth.idToken,
+      );
+
+      await FirebaseAuth.instance.signInWithCredential(credential);
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Pendaftaran dengan Google berhasil")),
+      );
+
+      // TODO: arahkan ke halaman utama jika diperlukan
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Registrasi Google gagal: ${e.toString()}")),
+      );
+    } finally {
+      setState(() => isLoading = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -96,10 +115,7 @@ Future<void> registerWithGoogle() async {
       body: Container(
         decoration: const BoxDecoration(
           gradient: LinearGradient(
-            colors: [
-              Color(0xFF006989),
-              Color(0xFFA3BAC3),
-            ],
+            colors: [Color(0xFF006989), Color(0xFFA3BAC3)],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
@@ -108,7 +124,8 @@ Future<void> registerWithGoogle() async {
           child: SingleChildScrollView(
             child: Container(
               margin: const EdgeInsets.all(24),
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(24),
@@ -125,10 +142,8 @@ Future<void> registerWithGoogle() async {
                 children: [
                   const Text(
                     'Sign Up',
-                    style: TextStyle(
-                      fontSize: 26,
-                      fontWeight: FontWeight.bold,
-                    ),
+                    style:
+                        TextStyle(fontSize: 26, fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 24),
 
@@ -137,6 +152,7 @@ Future<void> registerWithGoogle() async {
                     decoration: InputDecoration(
                       prefixIcon: const Icon(Icons.person_outline),
                       hintText: "Username",
+                      errorText: usernameError,
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
@@ -146,9 +162,11 @@ Future<void> registerWithGoogle() async {
 
                   TextField(
                     controller: emailController,
+                    keyboardType: TextInputType.emailAddress,
                     decoration: InputDecoration(
                       prefixIcon: const Icon(Icons.email_outlined),
                       hintText: "Email",
+                      errorText: emailError,
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
@@ -174,6 +192,7 @@ Future<void> registerWithGoogle() async {
                         },
                       ),
                       hintText: "Password",
+                      errorText: passwordError,
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
@@ -200,8 +219,8 @@ Future<void> registerWithGoogle() async {
                             ),
                     ),
                   ),
-
                   const SizedBox(height: 16),
+
                   Row(
                     children: const [
                       Expanded(child: Divider()),
@@ -214,7 +233,6 @@ Future<void> registerWithGoogle() async {
                   ),
                   const SizedBox(height: 16),
 
-                  // ✅ Button Google Sign-In
                   SizedBox(
                     width: double.infinity,
                     child: OutlinedButton.icon(
@@ -232,16 +250,18 @@ Future<void> registerWithGoogle() async {
                       ),
                     ),
                   ),
-
                   const SizedBox(height: 16),
+
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       const Text("Already have account? "),
                       GestureDetector(
                         onTap: () => Navigator.push(
-                          context, 
-                          MaterialPageRoute(builder: (_) => const LoginPage())),
+                          context,
+                          MaterialPageRoute(
+                              builder: (_) => const LoginPage()),
+                        ),
                         child: const Text(
                           "Sign In",
                           style: TextStyle(
