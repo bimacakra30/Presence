@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'register_page.dart';
 import 'package:presence/utils/page_transition.dart';
+import 'home.dart';
 
 
 class LoginPage extends StatefulWidget {
@@ -30,7 +31,12 @@ class _LoginPageState extends State<LoginPage> {
         const SnackBar(content: Text("Login berhasil")),
       );
 
-      // TODO: Navigate to home page
+      // Navigasi ke HomePage setelah login berhasil
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(builder: (context) => const HomePage()),
+        (route) => false,
+      );
     } on FirebaseAuthException catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(e.message ?? "Login gagal")),
@@ -67,7 +73,10 @@ Future<void> loginWithGoogle() async {
       const SnackBar(content: Text("Login Google berhasil")),
     );
 
-    // TODO: Navigate to home page
+    Navigator.pushReplacement(
+      context,
+      createFadeSlideRoute(const HomePage()),
+    );
   } catch (e) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text("Login Google gagal: ${e.toString()}")),
