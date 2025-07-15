@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'login_page.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:intl/intl.dart';
 
 class HomePage extends StatelessWidget {
   const HomePage({super.key});
@@ -15,21 +17,6 @@ class HomePage extends StatelessWidget {
       appBar: AppBar(
         backgroundColor: const Color(0xFF00A0E3),
         elevation: 0,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.logout, color: Colors.white),
-            onPressed: () async {
-              await FirebaseAuth.instance.signOut();
-              if (context.mounted) {
-                Navigator.pushAndRemoveUntil(
-                  context,
-                  MaterialPageRoute(builder: (context) => const LoginPage()),
-                  (route) => false,
-                );
-              }
-            },
-          ),
-        ],
       ),
       body: SafeArea(
         child: Column(
@@ -65,10 +52,24 @@ class HomePage extends StatelessWidget {
                       ],
                     ),
                   ),
-                  CircleAvatar(
-                    radius: 28,
-                    backgroundColor: Colors.white,
-                    child: Icon(Icons.pets, size: 30, color: Colors.grey[800]),
+                  GestureDetector(
+                    onTap: () {
+                      showModalBottomSheet(
+                        context: context,
+                        shape: const RoundedRectangleBorder(
+                          borderRadius:
+                              BorderRadius.vertical(top: Radius.circular(24)),
+                        ),
+                        builder: (context) {
+                          return const _ProfileModal();
+                        },
+                      );
+                    },
+                    child: CircleAvatar(
+                      radius: 28,
+                      backgroundColor: Colors.white,
+                      child: Icon(Icons.person, size: 30, color: Colors.grey[800]),
+                    ),
                   ),
                 ],
               ),
@@ -91,16 +92,19 @@ class HomePage extends StatelessWidget {
                 children: [
                   Row(
                     children: [
-                      const Expanded(
+                      Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text("Tanggal", style: TextStyle(fontSize: 13)),
                             SizedBox(height: 4),
-                            Text("Rabu, 09 Juli 2025",
-                                style: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 15)),
+                            Text(
+                              DateFormat('EEEE, dd MMMM yyyy', 'id_ID').format(DateTime.now()),
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 15,
+                                ),
+                                ),
                             SizedBox(height: 4),
                             Text("Masuk : -",
                                 style: TextStyle(color: Colors.blue)),
@@ -164,8 +168,22 @@ class HomePage extends StatelessWidget {
               ),
               child: MaterialButton(
                 padding: const EdgeInsets.symmetric(vertical: 16),
-                onPressed: () {
-                  // TODO: Tambahkan aksi presensi
+                onPressed: () async {
+                  final picker = ImagePicker();
+                  final XFile? photo =
+                      await picker.pickImage(source: ImageSource.camera);
+
+                  if (photo != null) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                          content: Text('Foto berhasil diambil: ${photo.name}')),
+                    );
+                  } else {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                          content: Text('Pengambilan foto dibatalkan')),
+                    );
+                  }
                 },
                 child: const Column(
                   children: [
@@ -195,7 +213,6 @@ class HomePage extends StatelessWidget {
             ),
 
             const SizedBox(height: 12),
-            // Menu utama
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 24),
               child: Wrap(
@@ -295,6 +312,67 @@ class _MenuIcon extends StatelessWidget {
             label,
             textAlign: TextAlign.center,
             style: const TextStyle(fontSize: 12),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ProfileModal extends StatelessWidget {
+  const _ProfileModal();
+
+  @override
+  Widget build(BuildContext context) {
+    final user = FirebaseAuth.instance.currentUser;
+    final name = user?.displayName ?? "Tidak diketahui";
+    final email = user?.email ?? "-";
+
+    return Padding(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 40,
+            height: 4,
+            margin: const EdgeInsets.only(bottom: 16),
+            decoration: BoxDecoration(
+              color: Colors.grey[300],
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          CircleAvatar(
+            radius: 40,
+            backgroundColor: Colors.blue[100],
+            child: Icon(Icons.person, size: 40, color: Colors.blue),
+          ),
+          const SizedBox(height: 12),
+          Text(name, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 4),
+          Text(email, style: const TextStyle(fontSize: 14, color: Colors.grey)),
+          const SizedBox(height: 24),
+          ListTile(
+            leading: const Icon(Icons.settings),
+            title: const Text("Pengaturan Akun"),
+            onTap: () {
+              Navigator.pop(context);
+              // TODO: Navigasi ke pengaturan
+            },
+          ),
+          ListTile(
+            leading: const Icon(Icons.logout),
+            title: const Text("Keluar"),
+            onTap: () async {
+              await FirebaseAuth.instance.signOut();
+              if (context.mounted) {
+                Navigator.pushAndRemoveUntil(
+                  context,
+                  MaterialPageRoute(builder: (context) => const LoginPage()),
+                  (route) => false,
+                );
+              }
+            },
           ),
         ],
       ),
