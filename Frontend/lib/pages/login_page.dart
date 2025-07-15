@@ -3,7 +3,6 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'register_page.dart';
-import 'package:presence/utils/page_transition.dart';
 import 'home.dart';
 
 class LoginPage extends StatefulWidget {
@@ -52,10 +51,9 @@ class _LoginPageState extends State<LoginPage> {
         context,
       ).showSnackBar(const SnackBar(content: Text("Login berhasil")));
 
-      Navigator.pushReplacement(
+      Navigator.push(
         context,
-        createFadeSlideRoute(const HomePage()),
-      );
+        MaterialPageRoute(builder: (_) => const HomePage()));
     } catch (e, stackTrace) {
       print('Login error: $e');
       print('Stack trace: $stackTrace');
@@ -95,10 +93,9 @@ class _LoginPageState extends State<LoginPage> {
         context,
       ).showSnackBar(const SnackBar(content: Text("Login Google berhasil")));
 
-      Navigator.pushReplacement(
-        context,
-        createFadeSlideRoute(const HomePage()),
-      );
+      Navigator.push(
+        context, 
+        MaterialPageRoute(builder: (_) => const HomePage()));
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text("Login Google gagal: ${e.toString()}")),
@@ -262,8 +259,7 @@ class _LoginPageState extends State<LoginPage> {
                         onTap: () {
                           Navigator.push(
                             context,
-                            createFadeSlideRoute(const RegisterPage()),
-                          );
+                            MaterialPageRoute(builder: (_) => const RegisterPage()));
                         },
                         child: const Text(
                           "Sign Up",

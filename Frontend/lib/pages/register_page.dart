@@ -3,7 +3,6 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'login_page.dart';
-import 'package:presence/utils/page_transition.dart';
 
 class RegisterPage extends StatefulWidget {
   const RegisterPage({super.key});
@@ -41,10 +40,9 @@ Future<void> register() async {
       const SnackBar(content: Text("Akun berhasil dibuat!")),
     );
 
-    Navigator.pushReplacement(
-      context,
-      createFadeSlideRoute(const LoginPage()),
-    );
+    Navigator.push(
+      context, 
+      MaterialPageRoute(builder: (_) => const LoginPage()));
   } on FirebaseAuthException catch (e) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(e.message ?? "Registrasi gagal")),
@@ -99,8 +97,8 @@ Future<void> registerWithGoogle() async {
         decoration: const BoxDecoration(
           gradient: LinearGradient(
             colors: [
-              Color(0xFFA3BAC3),
               Color(0xFF006989),
+              Color(0xFFA3BAC3),
             ],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
@@ -241,10 +239,9 @@ Future<void> registerWithGoogle() async {
                     children: [
                       const Text("Already have account? "),
                       GestureDetector(
-                        onTap: () => Navigator.pushReplacement(
-                          context,
-                          createFadeSlideRoute(const LoginPage()),
-                        ),
+                        onTap: () => Navigator.push(
+                          context, 
+                          MaterialPageRoute(builder: (_) => const LoginPage())),
                         child: const Text(
                           "Sign In",
                           style: TextStyle(
