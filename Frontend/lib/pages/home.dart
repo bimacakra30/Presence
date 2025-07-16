@@ -35,13 +35,26 @@ class _HomePageState extends State<HomePage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFEAEAEA),
+      appBar: PreferredSize(
+        preferredSize: Size.fromHeight(10),
+        child: AppBar(
+          backgroundColor: Color.fromARGB(195, 0, 159, 227),
+          elevation: 0,
+        ),
+      ),
       body: SafeArea(
         child: ListView(
-          padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewPadding.bottom + 16),
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.of(context).viewPadding.bottom + 16,
+          ),
           children: [
             Container(
-              padding: const EdgeInsets.only(top: 16, left: 24, right: 24, bottom: 16),
+              padding: const EdgeInsets.only(
+                top: 16,
+                left: 24,
+                right: 24,
+                bottom: 16,
+              ),
               decoration: const BoxDecoration(
                 gradient: LinearGradient(
                   colors: [Color(0xFF00A0E3), Color(0xFFB2EBF2)],
@@ -59,9 +72,10 @@ class _HomePageState extends State<HomePage> {
                         Text(
                           "Hi, $username",
                           style: const TextStyle(
-                              fontSize: 22,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.black),
+                            fontSize: 22,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.black,
+                          ),
                         ),
                         const SizedBox(height: 4),
                         const Text(
@@ -76,7 +90,9 @@ class _HomePageState extends State<HomePage> {
                       showModalBottomSheet(
                         context: context,
                         shape: const RoundedRectangleBorder(
-                          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+                          borderRadius: BorderRadius.vertical(
+                            top: Radius.circular(24),
+                          ),
                         ),
                         builder: (context) => _ProfileModal(name: username),
                       );
@@ -84,7 +100,11 @@ class _HomePageState extends State<HomePage> {
                     child: CircleAvatar(
                       radius: 28,
                       backgroundColor: Colors.white,
-                      child: Icon(Icons.person, size: 30, color: Colors.grey[800]),
+                      child: Icon(
+                        Icons.person,
+                        size: 30,
+                        color: Colors.grey[800],
+                      ),
                     ),
                   ),
                 ],
@@ -102,7 +122,7 @@ class _HomePageState extends State<HomePage> {
                     color: Colors.black12,
                     blurRadius: 8,
                     offset: Offset(0, 4),
-                  )
+                  ),
                 ],
               ),
               child: Column(
@@ -114,14 +134,26 @@ class _HomePageState extends State<HomePage> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Text("Tanggal", style: TextStyle(fontSize: 13)),
-                            const SizedBox(height: 4),
-                            Text(
-                              DateFormat('EEEE, dd MMMM yyyy', 'id_ID').format(DateTime.now()),
-                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                            const Text(
+                              "Tanggal",
+                              style: TextStyle(fontSize: 13),
                             ),
                             const SizedBox(height: 4),
-                            const Text("Masuk : -", style: TextStyle(color: Colors.blue)),
+                            Text(
+                              DateFormat(
+                                'EEEE, dd MMMM yyyy',
+                                'id_ID',
+                              ).format(DateTime.now()),
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 15,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            const Text(
+                              "Masuk : -",
+                              style: TextStyle(color: Colors.blue),
+                            ),
                           ],
                         ),
                       ),
@@ -131,24 +163,46 @@ class _HomePageState extends State<HomePage> {
                         children: const [
                           Text("Jadwal", style: TextStyle(fontSize: 13)),
                           SizedBox(height: 4),
-                          Text("08.00 - 17.00 WIB",
-                              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                          Text(
+                            "08.00 - 17.00 WIB",
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 15,
+                            ),
+                          ),
                           SizedBox(height: 4),
-                          Text("Pulang : -", style: TextStyle(color: Colors.blue)),
+                          Text(
+                            "Pulang : -",
+                            style: TextStyle(color: Colors.blue),
+                          ),
                         ],
                       ),
                     ],
                   ),
                   const Divider(height: 32),
-                  const Text("Rekab Presensi Bulan Ini",
-                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+                  const Text(
+                    "Rekab Presensi Bulan Ini",
+                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+                  ),
                   const SizedBox(height: 12),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                     children: const [
-                      _StatusInfo(label: "Hadir", count: "7 Hari", color: Colors.green),
-                      _StatusInfo(label: "Izin", count: "0 Hari", color: Colors.orange),
-                      _StatusInfo(label: "Tidak Hadir", count: "0 Hari", color: Colors.red),
+                      _StatusInfo(
+                        label: "Hadir",
+                        count: "7 Hari",
+                        color: Colors.green,
+                      ),
+                      _StatusInfo(
+                        label: "Izin",
+                        count: "0 Hari",
+                        color: Colors.orange,
+                      ),
+                      _StatusInfo(
+                        label: "Tidak Hadir",
+                        count: "0 Hari",
+                        color: Colors.red,
+                      ),
                     ],
                   ),
                 ],
@@ -168,15 +222,21 @@ class _HomePageState extends State<HomePage> {
                 padding: const EdgeInsets.symmetric(vertical: 16),
                 onPressed: () async {
                   final picker = ImagePicker();
-                  final XFile? photo = await picker.pickImage(source: ImageSource.camera);
+                  final XFile? photo = await picker.pickImage(
+                    source: ImageSource.camera,
+                  );
 
                   if (photo != null) {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('Foto berhasil diambil: ${photo.name}')),
+                      SnackBar(
+                        content: Text('Foto berhasil diambil: ${photo.name}'),
+                      ),
                     );
                   } else {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Pengambilan foto dibatalkan')),
+                      const SnackBar(
+                        content: Text('Pengambilan foto dibatalkan'),
+                      ),
                     );
                   }
                 },
@@ -184,11 +244,18 @@ class _HomePageState extends State<HomePage> {
                   children: [
                     Icon(Icons.qr_code_scanner, color: Colors.white, size: 28),
                     SizedBox(height: 4),
-                    Text("Presensi Sekarang",
-                        style: TextStyle(
-                            color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
-                    Text("(Pastikan berada di Lingkungan kantor)",
-                        style: TextStyle(color: Colors.white70, fontSize: 12)),
+                    Text(
+                      "Presensi Sekarang",
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                      ),
+                    ),
+                    Text(
+                      "(Pastikan berada di Lingkungan kantor)",
+                      style: TextStyle(color: Colors.white70, fontSize: 12),
+                    ),
                   ],
                 ),
               ),
@@ -199,8 +266,10 @@ class _HomePageState extends State<HomePage> {
               padding: EdgeInsets.symmetric(horizontal: 24),
               child: Align(
                 alignment: Alignment.centerLeft,
-                child: Text("Menu Utama",
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                child: Text(
+                  "Menu Utama",
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                ),
               ),
             ),
 
@@ -212,11 +281,20 @@ class _HomePageState extends State<HomePage> {
                 runSpacing: 16,
                 spacing: 6,
                 children: const [
-                  _MenuIcon(icon: Icons.assignment_outlined, label: "Riwayat Presensi"),
+                  _MenuIcon(
+                    icon: Icons.assignment_outlined,
+                    label: "Riwayat Presensi",
+                  ),
                   _MenuIcon(icon: Icons.location_on_outlined, label: "Lokasi"),
                   _MenuIcon(icon: Icons.mail_outline, label: "Pengajuan Izin"),
-                  _MenuIcon(icon: Icons.event_note_outlined, label: "Aktivitas"),
-                  _MenuIcon(icon: Icons.attach_money_outlined, label: "Informasi Gaji"),
+                  _MenuIcon(
+                    icon: Icons.event_note_outlined,
+                    label: "Aktivitas",
+                  ),
+                  _MenuIcon(
+                    icon: Icons.attach_money_outlined,
+                    label: "Informasi Gaji",
+                  ),
                 ],
               ),
             ),
@@ -244,9 +322,14 @@ class _StatusInfo extends StatelessWidget {
   Widget build(BuildContext context) {
     return Column(
       children: [
-        Text(count,
-            style: TextStyle(
-                color: color, fontWeight: FontWeight.bold, fontSize: 16)),
+        Text(
+          count,
+          style: TextStyle(
+            color: color,
+            fontWeight: FontWeight.bold,
+            fontSize: 16,
+          ),
+        ),
         const SizedBox(height: 4),
         Text(label, style: const TextStyle(fontSize: 13)),
         const SizedBox(height: 4),
@@ -257,7 +340,7 @@ class _StatusInfo extends StatelessWidget {
             color: color,
             borderRadius: BorderRadius.circular(2),
           ),
-        )
+        ),
       ],
     );
   }
@@ -281,13 +364,21 @@ class _MenuIcon extends StatelessWidget {
               color: Colors.white,
               borderRadius: BorderRadius.circular(16),
               boxShadow: const [
-                BoxShadow(color: Colors.black12, blurRadius: 4, offset: Offset(0, 2))
+                BoxShadow(
+                  color: Colors.black12,
+                  blurRadius: 4,
+                  offset: Offset(0, 2),
+                ),
               ],
             ),
             child: Icon(icon, color: Colors.cyan[700], size: 28),
           ),
           const SizedBox(height: 8),
-          Text(label, textAlign: TextAlign.center, style: const TextStyle(fontSize: 12)),
+          Text(
+            label,
+            textAlign: TextAlign.center,
+            style: const TextStyle(fontSize: 12),
+          ),
         ],
       ),
     );
@@ -327,9 +418,18 @@ class _ProfileModal extends StatelessWidget {
                 child: Icon(Icons.person, size: 40, color: Colors.blue),
               ),
               const SizedBox(height: 12),
-              Text(name, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              Text(
+                name,
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
               const SizedBox(height: 4),
-              Text(email, style: const TextStyle(fontSize: 14, color: Colors.grey)),
+              Text(
+                email,
+                style: const TextStyle(fontSize: 14, color: Colors.grey),
+              ),
               const SizedBox(height: 24),
               ListTile(
                 leading: const Icon(Icons.settings),
@@ -346,7 +446,9 @@ class _ProfileModal extends StatelessWidget {
                   if (context.mounted) {
                     Navigator.pushAndRemoveUntil(
                       context,
-                      MaterialPageRoute(builder: (context) => const LoginPage()),
+                      MaterialPageRoute(
+                        builder: (context) => const LoginPage(),
+                      ),
                       (route) => false,
                     );
                   }
