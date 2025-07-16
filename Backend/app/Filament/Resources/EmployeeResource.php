@@ -30,6 +30,7 @@ class EmployeeResource extends Resource
                     ->previewable()
                     ->nullable(),
                 Forms\Components\TextInput::make('name')
+                    ->label('Username')
                     ->required()
                     ->maxLength(255),
                 Forms\Components\TextInput::make('email')
@@ -47,6 +48,23 @@ class EmployeeResource extends Resource
                     ->default(null),
                 Forms\Components\TextInput::make('salary')
                     ->numeric()
+                    ->default(null),      
+                Forms\Components\Select::make('status')
+                    ->options([
+                        'aktif' => 'Active',
+                        'non-aktif' => 'Inactive',
+                        'terminated' => 'Terminated',
+                    ])
+                    ->default('active')
+                    ->required(),        
+                Forms\Components\Select::make('provider')
+                    ->options([
+                        'google' => 'Google',
+                        'facebook' => 'Facebook',
+                        'twitter' => 'Twitter',
+                        'github' => 'GitHub',
+                    ])
+                    ->nullable()
                     ->default(null),
             ]);
     }
@@ -62,6 +80,7 @@ class EmployeeResource extends Resource
                     ->circular()
                     ->height(50),
                 Tables\Columns\TextColumn::make('name')
+                    ->label('Username')
                     ->searchable(),
                 Tables\Columns\TextColumn::make('email')
                     ->searchable(),
@@ -75,6 +94,10 @@ class EmployeeResource extends Resource
                 Tables\Columns\TextColumn::make('salary')
                     ->numeric()
                     ->sortable(),
+                Tables\Columns\TextColumn::make('provider')
+                    ->searchable(),
+                Tables\Columns\TextColumn::make('status')
+                    ->searchable(),
                 Tables\Columns\TextColumn::make('created_at')
                     ->dateTime()
                     ->sortable()
@@ -90,8 +113,15 @@ class EmployeeResource extends Resource
             ])
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
-                    Tables\Actions\DeleteBulkAction::make(),
-                ]),
+                    Tables\Actions\DeleteBulkAction::make()
+                        ->label('Force Delete')
+                        ->requiresConfirmation()
+                        ->action(function ($records) {
+                            foreach ($records as $record) {
+                                $record->forceDelete();
+                            }
+                        }),
+                ])
             ]);
     }
 

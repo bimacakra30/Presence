@@ -9,7 +9,7 @@ use App\Models\Employee;
 class SyncFirestoreEmployees extends Command
 {
     protected $signature = 'sync:firestore-employees';
-    protected $description = 'Sync employees from Firestore to local database';
+    protected $description = 'Sync employees from Firestore to local database without creating duplicates in Firestore';
 
     public function handle()
     {
@@ -19,30 +19,29 @@ class SyncFirestoreEmployees extends Command
         foreach ($users as $user) {
             $firestoreId = $user['id'] ?? null;
 
-            $employee = Employee::updateOrCreate(
-                [
-                    'email' => $user['email'],
-                ],
-                [
-                    'name' => $user['username'] ?? 'No Name',
-                    'email' => $user['email'],
-                    'firestore_id' => $firestoreId,
-                    'created_at' => isset($user['createdAt']) ? now()->parse($user['createdAt']) : now(),
+            Employee::withoutEvents(function () use ($user, $firestoreId) {
+                Employee::updateOrCreate(
+                    [
+                        'email' => $user['email'],
+                    ],
+                    [
+                        'name' => $user['username'] ?? 'No Name',
+                        'email' => $user['email'],
+                        'firestore_id' => $firestoreId,
+                        'created_at' => isset($user['createdAt']) ? now()->parse($user['createdAt']) : now(),
 
-                    'phone' => null,
-                    'address' => null,
-                    'date_of_birth' => null,
-                    'position' => null,
-                    'salary' => null,
-                    'photo' => null,
-                ]
-            );
-
-            if (!$employee->firestore_id && $firestoreId) {
-                $employee->forceFill(['firestore_id' => $firestoreId])->save();
-            }
+                        'phone' => null,
+                        'address' => null,
+                        'date_of_birth' => null,
+                        'position' => null,
+                        'salary' => null,
+                        'provider' => $user['provider'] ?? null,
+                        'photo' => null,
+                    ]
+                );
+            });
         }
 
-        $this->info('✅ Employees synced successfully from Firestore!');
+        $this->info('✅ Employees synced successfully from Firestore without duplicate!');
     }
 }

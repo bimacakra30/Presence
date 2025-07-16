@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Employee extends Model
 {
@@ -19,60 +20,52 @@ class Employee extends Model
         'date_of_birth',
         'position',
         'salary',
+        'provider',
+        'status',
+        'firestore_id',
     ];
 
     protected static function booted()
     {
+        // Create
         static::created(function ($employee) {
             $service = new \App\Services\FirestoreService();
 
             $data = [
                 'username' => $employee->name,
                 'email' => $employee->email,
+                'status' => $employee->status,
                 'createdAt' => now()->toISOString(),
             ];
 
-            // Create document tanpa ID → Firestore auto-generate ID random
             $collection = $service->getCollection();
             $docRef = $collection->add($data);
 
-            // Ambil ID random Firestore
             $firestoreId = $docRef->id();
 
-            // Update kolom firestore_id di DB lokal
             $employee->firestore_id = $firestoreId;
             $employee->saveQuietly();
         });
 
+        // Update
         static::updated(function ($employee) {
-            if ($employee->firestore_id && $employee->isDirty('email')) {
-                $authService = new \App\Services\FirebaseAuthService();
-
-                try {
-                    // Get user Auth by old email
-                    $userAuth = $authService->getUserByEmail($employee->getOriginal('email'));
-
-                    // Update email Auth
-                    $authService->updateEmail($userAuth->uid, $employee->email);
-
-                } catch (\Exception $e) {
-                    Log::error('Failed to update Firebase Auth email: ' . $e->getMessage());
-                }
-            }
-
             if ($employee->firestore_id) {
                 $service = new \App\Services\FirestoreService();
 
                 $data = [
                     'username' => $employee->name,
                     'email' => $employee->email,
+                    'status' => $employee->status,
                 ];
 
                 $service->updateUser($employee->firestore_id, $data);
             }
         });
 
+        // Delete — only when force delete
         static::deleted(function ($employee) {
+            Log::info("Deleted event called. Firestore ID: " . $employee->firestore_id);
+
             if ($employee->firestore_id) {
                 $service = new \App\Services\FirestoreService();
                 $service->deleteUser($employee->firestore_id);
