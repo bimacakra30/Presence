@@ -2,9 +2,11 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'loading_page.dart';
 import 'package:presence/components/dialog/forgot_password_dialog.dart';
 import 'home.dart';
+import 'package:bcrypt/bcrypt.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -52,12 +54,18 @@ class _LoginPageState extends State<LoginPage> {
       }
 
       final userDoc = query.docs.first;
-      final email = userDoc['email'];
+      final hashedPassword = userDoc['password'];
+      final isMatch = BCrypt.checkpw(password, hashedPassword);
 
-      await FirebaseAuth.instance.signInWithEmailAndPassword(
-        email: email,
-        password: password,
-      );
+      if (!isMatch) {
+        Navigator.pop(context);
+        setState(() => passwordError = "Password salah");
+        return;
+      }
+
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('name', userDoc['name']);
+      await prefs.setString('email', userDoc['email']); // Tambahkan baris ini
 
       await Future.delayed(const Duration(seconds: 2));
 
@@ -66,13 +74,6 @@ class _LoginPageState extends State<LoginPage> {
         MaterialPageRoute(builder: (_) => const HomePage()),
         (route) => false,
       );
-    } on FirebaseAuthException catch (e) {
-      Navigator.pop(context);
-      if (e.code == 'wrong-password') {
-        setState(() => passwordError = "Password salah");
-      } else {
-        setState(() => passwordError = e.message ?? "Login gagal");
-      }
     } catch (e) {
       Navigator.pop(context);
       setState(() => passwordError = "Terjadi kesalahan: ${e.toString()}");
@@ -95,7 +96,6 @@ class _LoginPageState extends State<LoginPage> {
         return;
       }
 
-      // ✅ Cek apakah email sudah terdaftar di Firestore
       final email = googleUser.email;
       final query = await FirebaseFirestore.instance
           .collection('users')
@@ -111,7 +111,6 @@ class _LoginPageState extends State<LoginPage> {
         return;
       }
 
-      // ✅ Lanjut login ke Firebase Auth
       final googleAuth = await googleUser.authentication;
       final credential = GoogleAuthProvider.credential(
         accessToken: googleAuth.accessToken,
