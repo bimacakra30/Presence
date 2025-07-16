@@ -22,50 +22,70 @@ class EmployeeResource extends Resource
         return $form
             ->schema([
                 Forms\Components\FileUpload::make('photo')
-                    ->label('photo profile')
+                    ->label('Photo Profile')
                     ->directory('photos')
                     ->image()
+                    ->imagePreviewHeight('200')
                     ->visibility('public')
-                    ->imagePreviewHeight('300')
                     ->previewable()
                     ->nullable(),
+
                 Forms\Components\TextInput::make('name')
                     ->label('Username')
                     ->required()
                     ->maxLength(255),
+
                 Forms\Components\TextInput::make('email')
+                    ->label('Email')
                     ->email()
                     ->required()
                     ->maxLength(255),
+
                 Forms\Components\TextInput::make('phone')
-                    ->numeric()
-                    ->default(null),
+                    ->label('Phone Number')
+                    ->tel()
+                    ->maxLength(20)
+                    ->nullable(),
+
                 Forms\Components\Textarea::make('address')
-                    ->columnSpanFull(),
-                Forms\Components\DatePicker::make('date_of_birth'),
+                    ->label('Address')
+                    ->columnSpanFull()
+                    ->nullable(),
+
+                Forms\Components\DatePicker::make('date_of_birth')
+                    ->label('Date of Birth')
+                    ->nullable(),
+
                 Forms\Components\TextInput::make('position')
+                    ->label('Position')
                     ->maxLength(255)
-                    ->default(null),
+                    ->nullable(),
+
                 Forms\Components\TextInput::make('salary')
+                    ->label('Salary')
                     ->numeric()
-                    ->default(null),      
+                    ->prefix('Rp')
+                    ->nullable(),
+
                 Forms\Components\Select::make('status')
+                    ->label('Status')
+                    ->required()
                     ->options([
                         'aktif' => 'Active',
                         'non-aktif' => 'Inactive',
                         'terminated' => 'Terminated',
                     ])
-                    ->default('active')
-                    ->required(),        
+                    ->default('aktif'),
+
                 Forms\Components\Select::make('provider')
+                    ->label('Login Provider')
                     ->options([
                         'google' => 'Google',
                         'facebook' => 'Facebook',
                         'twitter' => 'Twitter',
                         'github' => 'GitHub',
                     ])
-                    ->nullable()
-                    ->default(null),
+                    ->nullable(),
             ]);
     }
 
@@ -74,40 +94,63 @@ class EmployeeResource extends Resource
         return $table
             ->columns([
                 Tables\Columns\ImageColumn::make('photo')
-                    ->label('Image')
-                    ->getStateUsing(fn ($record) => asset('storage/' . $record->photo))
-                    ->visibility('public')
+                    ->label('Photo')
+                    ->getStateUsing(fn ($record) => $record->photo ? asset('storage/' . $record->photo) : null)
                     ->circular()
                     ->height(50),
+
                 Tables\Columns\TextColumn::make('name')
                     ->label('Username')
                     ->searchable(),
+
                 Tables\Columns\TextColumn::make('email')
+                    ->label('Email')
                     ->searchable(),
+
                 Tables\Columns\TextColumn::make('phone')
+                    ->label('Phone')
                     ->sortable(),
+
                 Tables\Columns\TextColumn::make('date_of_birth')
+                    ->label('Birth Date')
                     ->date()
                     ->sortable(),
+
                 Tables\Columns\TextColumn::make('position')
+                    ->label('Position')
                     ->searchable(),
+
                 Tables\Columns\TextColumn::make('salary')
-                    ->numeric()
+                    ->label('Salary')
+                    ->money('IDR')
                     ->sortable(),
+
                 Tables\Columns\TextColumn::make('provider')
+                    ->label('Provider')
                     ->searchable(),
+
                 Tables\Columns\TextColumn::make('status')
-                    ->searchable(),
+                    ->label('Status')
+                    ->badge()
+                    ->color(fn (string $state): string => match ($state) {
+                        'aktif' => 'success',
+                        'non-aktif' => 'warning',
+                        'terminated' => 'danger',
+                        default => 'gray',
+                    }),
+
                 Tables\Columns\TextColumn::make('created_at')
+                    ->label('Created At')
                     ->dateTime()
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
+
                 Tables\Columns\TextColumn::make('updated_at')
+                    ->label('Updated At')
                     ->dateTime()
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
             ])
-            ->filters([])
             ->actions([
                 Tables\Actions\EditAction::make(),
             ])
@@ -116,11 +159,7 @@ class EmployeeResource extends Resource
                     Tables\Actions\DeleteBulkAction::make()
                         ->label('Force Delete')
                         ->requiresConfirmation()
-                        ->action(function ($records) {
-                            foreach ($records as $record) {
-                                $record->forceDelete();
-                            }
-                        }),
+                        ->action(fn ($records) => $records->each->forceDelete()),
                 ])
             ]);
     }

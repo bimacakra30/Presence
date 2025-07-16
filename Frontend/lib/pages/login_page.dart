@@ -3,7 +3,6 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'loading_page.dart';
-import 'register_page.dart';
 import 'package:presence/components/dialog/forgot_password_dialog.dart';
 import 'home.dart';
 
@@ -34,7 +33,6 @@ class _LoginPageState extends State<LoginPage> {
 
     if (usernameError != null || passwordError != null) return;
 
-    // ✅ Tampilkan loading page dulu
     Navigator.push(
       context,
       MaterialPageRoute(builder: (_) => const LoadingPage()),
@@ -48,7 +46,7 @@ class _LoginPageState extends State<LoginPage> {
           .get();
 
       if (query.docs.isEmpty) {
-        Navigator.pop(context); // Kembali dari LoadingPage
+        Navigator.pop(context);
         setState(() => usernameError = "Username tidak ditemukan");
         return;
       }
@@ -61,7 +59,6 @@ class _LoginPageState extends State<LoginPage> {
         password: password,
       );
 
-      // ✅ Beri delay biar animasi sempat terlihat
       await Future.delayed(const Duration(seconds: 2));
 
       Navigator.pushAndRemoveUntil(
@@ -70,83 +67,73 @@ class _LoginPageState extends State<LoginPage> {
         (route) => false,
       );
     } on FirebaseAuthException catch (e) {
-      Navigator.pop(context); // Kembali dari LoadingPage
-
+      Navigator.pop(context);
       if (e.code == 'wrong-password') {
         setState(() => passwordError = "Password salah");
       } else {
         setState(() => passwordError = e.message ?? "Login gagal");
       }
     } catch (e) {
-      Navigator.pop(context); // Kembali dari LoadingPage
+      Navigator.pop(context);
       setState(() => passwordError = "Terjadi kesalahan: ${e.toString()}");
     }
   }
 
-Future<void> loginWithGoogle() async {
-  // Tampilkan animasi loading
-  Navigator.push(
-    context,
-    MaterialPageRoute(builder: (_) => const LoadingPage()),
-  );
-
-  try {
-    final googleSignIn = GoogleSignIn();
-    await googleSignIn.signOut(); // logout akun sebelumnya
-
-    final GoogleSignInAccount? googleUser = await googleSignIn.signIn();
-    if (googleUser == null) {
-      Navigator.pop(context); // keluar dari loading page
-      return;
-    }
-
-    final GoogleSignInAuthentication googleAuth =
-        await googleUser.authentication;
-
-    final credential = GoogleAuthProvider.credential(
-      accessToken: googleAuth.accessToken,
-      idToken: googleAuth.idToken,
-    );
-
-    // Login ke Firebase
-    final userCredential =
-        await FirebaseAuth.instance.signInWithCredential(credential);
-    final user = userCredential.user;
-
-    // Cek apakah data user sudah ada di Firestore
-    final userDoc = await FirebaseFirestore.instance
-        .collection('users')
-        .doc(user!.uid)
-        .get();
-
-    if (!userDoc.exists) {
-      // Simpan user baru ke Firestore
-      await FirebaseFirestore.instance
-          .collection('users')
-          .doc(user.uid)
-          .set({
-        'username': user.displayName ?? user.email!.split('@')[0],
-        'email': user.email,
-        'createdAt': Timestamp.now(),
-        'provider': 'google',
-      });
-    }
-
-    await Future.delayed(const Duration(seconds: 2));
-
-    // Navigasi ke halaman utama
-    Navigator.pushAndRemoveUntil(
+  Future<void> loginWithGoogle() async {
+    Navigator.push(
       context,
-      MaterialPageRoute(builder: (_) => const HomePage()),
-      (route) => false,
+      MaterialPageRoute(builder: (_) => const LoadingPage()),
     );
-  } catch (e) {
-    Navigator.pop(context); // keluar dari loading page
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text("Login Google gagal: ${e.toString()}")),
-    );
+
+    try {
+      final googleSignIn = GoogleSignIn();
+      await googleSignIn.signOut();
+
+      final GoogleSignInAccount? googleUser = await googleSignIn.signIn();
+      if (googleUser == null) {
+        Navigator.pop(context);
+        return;
+      }
+
+      // ✅ Cek apakah email sudah terdaftar di Firestore
+      final email = googleUser.email;
+      final query = await FirebaseFirestore.instance
+          .collection('users')
+          .where('email', isEqualTo: email)
+          .limit(1)
+          .get();
+
+      if (query.docs.isEmpty) {
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Akun Google belum terdaftar")),
+        );
+        return;
+      }
+
+      // ✅ Lanjut login ke Firebase Auth
+      final googleAuth = await googleUser.authentication;
+      final credential = GoogleAuthProvider.credential(
+        accessToken: googleAuth.accessToken,
+        idToken: googleAuth.idToken,
+      );
+
+      await FirebaseAuth.instance.signInWithCredential(credential);
+
+      await Future.delayed(const Duration(seconds: 2));
+
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(builder: (_) => const HomePage()),
+        (route) => false,
+      );
+    } catch (e) {
+      Navigator.pop(context);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Login Google gagal: ${e.toString()}")),
+      );
+    }
   }
-}
 
   @override
   Widget build(BuildContext context) {
@@ -285,31 +272,7 @@ Future<void> loginWithGoogle() async {
                       ),
                     ),
                   ),
-                  const SizedBox(height: 16),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const Text("Don't have account? "),
-                      GestureDetector(
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => const RegisterPage(),
-                            ),
-                          );
-                        },
-                        child: const Text(
-                          "Sign Up",
-                          style: TextStyle(
-                            color: Colors.blue,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                      const Text(" Here!"),
-                    ],
-                  ),
+                  const SizedBox(height: 8),
                 ],
               ),
             ),
