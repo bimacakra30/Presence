@@ -2,29 +2,20 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Facades\Hash;
 
-class Employee extends Model
+class EmployeePosition extends Model
 {
     use HasFactory;
 
     protected $fillable = [
-        'photo',
-        'name',
-        'username',
-        'email',
-        'phone',
-        'password',
-        'address',
-        'date_of_birth',
-        'salary',
-        'provider',
-        'status',
-        'firestore_id',
+        'employee_id',
+        'position',
+        'start_date',
+        'end_date',
     ];
 
     protected static function booted()
@@ -34,13 +25,10 @@ class Employee extends Model
             $service = new \App\Services\FirestoreService();
 
             $data = [
-                'name' => $employee->name,
-                'username' => $employee->username,
-                'email' => $employee->email,
-                'password' => Hash::make($employee->password),
-                'status' => $employee->status,
-                'provider' => $employee->provider,
-                'createdAt' => now()->toISOString(),
+                'employee_id' => $employee->employee_id,
+                'position' => $employee->position,
+                'start_date' => $employee->start_date,
+                'end_date' => $employee->end_date,
             ];
 
             $collection = $service->getCollection();
@@ -58,8 +46,10 @@ class Employee extends Model
                 $service = new \App\Services\FirestoreService();
 
                 $data = [
-                    'email' => $employee->email,
-                    'status' => $employee->status,
+                    'employee_id' => $employee->employee_id,
+                    'position' => $employee->position,
+                    'start_date' => $employee->start_date->toISOString(),
+                    'end_date' => $employee->end_date ? $employee->end_date->toISOString() : null,
                 ];
 
                 $service->updateUser($employee->firestore_id, $data);
@@ -77,12 +67,8 @@ class Employee extends Model
         });
     }
 
-    public function positions()
+    public function employee()
     {
-        return $this->hasMany(EmployeePosition::class, 'employee_id');
-    }
-    public function salaries()
-    {
-        return $this->hasMany(EmployeeSalary::class, 'employee_id');
+        return $this->belongsTo(Employee::class, 'employee_id');
     }
 }

@@ -26,41 +26,50 @@ class EmployeeResource extends Resource
                     ->directory('photos')
                     ->image()
                     ->imagePreviewHeight('200')
+                    ->disabled(fn ($context) => $context === 'edit')
                     ->visibility('public')
                     ->previewable()
                     ->nullable(),
-
                 Forms\Components\TextInput::make('name')
+                    ->label('Full Name')
+                    ->disabled(fn ($context) => $context === 'edit')
+                    ->required(),
+
+                Forms\Components\TextInput::make('username')
                     ->label('Username')
+                    ->disabled(fn ($context) => $context === 'edit')
                     ->required()
                     ->maxLength(255),
 
                 Forms\Components\TextInput::make('email')
                     ->label('Email')
+                    ->disabled(fn ($context) => $context === 'edit')
                     ->email()
                     ->required()
                     ->maxLength(255),
-
+                Forms\Components\TextInput::make('password')
+                    ->label('Password')
+                    ->hidden(fn ($context) => $context === 'edit')
+                    ->password()
+                    ->required()
+                    ->minLength(8),
                 Forms\Components\TextInput::make('phone')
                     ->label('Phone Number')
+                    ->disabled(fn ($context) => $context === 'edit')
                     ->tel()
                     ->maxLength(20)
                     ->nullable(),
 
                 Forms\Components\Textarea::make('address')
                     ->label('Address')
+                    ->disabled(fn ($context) => $context === 'edit')
                     ->columnSpanFull()
                     ->nullable(),
 
                 Forms\Components\DatePicker::make('date_of_birth')
                     ->label('Date of Birth')
+                    ->disabled(fn ($context) => $context === 'edit')
                     ->nullable(),
-
-                Forms\Components\TextInput::make('position')
-                    ->label('Position')
-                    ->maxLength(255)
-                    ->nullable(),
-
                 Forms\Components\TextInput::make('salary')
                     ->label('Salary')
                     ->numeric()
@@ -79,6 +88,7 @@ class EmployeeResource extends Resource
 
                 Forms\Components\Select::make('provider')
                     ->label('Login Provider')
+                    ->disabled(fn ($context) => $context === 'edit')
                     ->options([
                         'google' => 'Google',
                         'facebook' => 'Facebook',
@@ -98,11 +108,12 @@ class EmployeeResource extends Resource
                     ->getStateUsing(fn ($record) => $record->photo ? asset('storage/' . $record->photo) : null)
                     ->circular()
                     ->height(50),
-
                 Tables\Columns\TextColumn::make('name')
+                    ->label('Full Name')
+                    ->searchable(),
+                Tables\Columns\TextColumn::make('username')
                     ->label('Username')
                     ->searchable(),
-
                 Tables\Columns\TextColumn::make('email')
                     ->label('Email')
                     ->searchable(),
