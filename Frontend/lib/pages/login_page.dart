@@ -83,48 +83,70 @@ class _LoginPageState extends State<LoginPage> {
     }
   }
 
-  Future<void> loginWithGoogle() async {
-    // Tampilkan loading page sebelum proses login
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (_) => const LoadingPage()),
+Future<void> loginWithGoogle() async {
+  // Tampilkan animasi loading
+  Navigator.push(
+    context,
+    MaterialPageRoute(builder: (_) => const LoadingPage()),
+  );
+
+  try {
+    final googleSignIn = GoogleSignIn();
+    await googleSignIn.signOut(); // logout akun sebelumnya
+
+    final GoogleSignInAccount? googleUser = await googleSignIn.signIn();
+    if (googleUser == null) {
+      Navigator.pop(context); // keluar dari loading page
+      return;
+    }
+
+    final GoogleSignInAuthentication googleAuth =
+        await googleUser.authentication;
+
+    final credential = GoogleAuthProvider.credential(
+      accessToken: googleAuth.accessToken,
+      idToken: googleAuth.idToken,
     );
 
-    try {
-      final googleSignIn = GoogleSignIn();
+    // Login ke Firebase
+    final userCredential =
+        await FirebaseAuth.instance.signInWithCredential(credential);
+    final user = userCredential.user;
 
-      await googleSignIn.signOut(); // logout akun sebelumnya
+    // Cek apakah data user sudah ada di Firestore
+    final userDoc = await FirebaseFirestore.instance
+        .collection('users')
+        .doc(user!.uid)
+        .get();
 
-      final GoogleSignInAccount? googleUser = await googleSignIn.signIn();
-      if (googleUser == null) {
-        Navigator.pop(context); // kembali dari loading page
-        return;
-      }
-
-      final GoogleSignInAuthentication googleAuth =
-          await googleUser.authentication;
-
-      final credential = GoogleAuthProvider.credential(
-        accessToken: googleAuth.accessToken,
-        idToken: googleAuth.idToken,
-      );
-
-      await FirebaseAuth.instance.signInWithCredential(credential);
-
-      // Arahkan ke halaman utama
-      Navigator.pushAndRemoveUntil(
-        context,
-        MaterialPageRoute(builder: (_) => const HomePage()),
-        (route) => false,
-      );
-    } catch (e) {
-      Navigator.pop(context); // kembali dari loading page
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Login Google gagal: ${e.toString()}")),
-      );
+    if (!userDoc.exists) {
+      // Simpan user baru ke Firestore
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .set({
+        'username': user.displayName ?? user.email!.split('@')[0],
+        'email': user.email,
+        'createdAt': Timestamp.now(),
+        'provider': 'google',
+      });
     }
+
+    await Future.delayed(const Duration(seconds: 2));
+
+    // Navigasi ke halaman utama
+    Navigator.pushAndRemoveUntil(
+      context,
+      MaterialPageRoute(builder: (_) => const HomePage()),
+      (route) => false,
+    );
+  } catch (e) {
+    Navigator.pop(context); // keluar dari loading page
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text("Login Google gagal: ${e.toString()}")),
+    );
   }
+}
 
   @override
   Widget build(BuildContext context) {
