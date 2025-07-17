@@ -21,10 +21,13 @@ class Employee extends Model
         'password',
         'address',
         'date_of_birth',
-        'salary',
-        'provider',
         'status',
+        'provider',
         'firestore_id',
+    ];
+
+    protected $hidden = [
+        'password',
     ];
 
     protected static function booted()
@@ -60,6 +63,7 @@ class Employee extends Model
                 $data = [
                     'email' => $employee->email,
                     'status' => $employee->status,
+                    'provider' => $employee->provider,
                 ];
 
                 $service->updateUser($employee->firestore_id, $data);
@@ -84,5 +88,10 @@ class Employee extends Model
     public function salaries()
     {
         return $this->hasMany(EmployeeSalary::class, 'employee_id');
+    }
+
+    public function presences()
+    {
+        return $this->hasMany(Presence::class, 'employee_id');
     }
 }

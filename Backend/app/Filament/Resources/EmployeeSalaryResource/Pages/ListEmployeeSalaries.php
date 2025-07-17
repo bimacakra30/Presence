@@ -10,6 +10,11 @@ class ListEmployeeSalaries extends ListRecords
 {
     protected static string $resource = EmployeeSalaryResource::class;
 
+    public function getTitle(): string
+    {
+        return 'Gaji Karyawan';
+    }
+
     protected function getHeaderActions(): array
     {
         return [

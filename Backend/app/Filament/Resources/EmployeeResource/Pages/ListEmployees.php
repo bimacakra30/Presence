@@ -10,6 +10,11 @@ class ListEmployees extends ListRecords
 {
     protected static string $resource = EmployeeResource::class;
 
+    public function getTitle(): string
+    {
+        return 'Karyawan';
+    }
+
     protected function getHeaderActions(): array
     {
         return [

@@ -18,7 +18,7 @@ class EmployeeSalaryResource extends Resource
 {
     protected static ?string $model = EmployeeSalary::class;
     protected static ?string $navigationGroup = 'Management';
-    protected static ?string $navigationLabel = 'Employee Salaries Management';
+    protected static ?string $navigationLabel = 'Gaji Karyawan';
     protected static ?int $navigationSort = 3;
 
     protected static ?string $navigationIcon = 'heroicon-o-currency-dollar';
@@ -55,6 +55,7 @@ class EmployeeSalaryResource extends Resource
                     ->sortable(),
                 Tables\Columns\TextColumn::make('amount')
                     ->numeric()
+                    ->money('IDR')
                     ->sortable(),
                 Tables\Columns\TextColumn::make('effective_date')
                     ->date()

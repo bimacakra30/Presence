@@ -56,4 +56,31 @@ class FirestoreService
 
         return $users;
     }
+
+    public function getAbsensi()
+    {
+        $firestore = new FirestoreClient([
+            'projectId' => 'presence-app-735f3', // Ganti sesuai project ID kamu
+        ]);
+
+        $collection = $firestore->collection('absensi');
+        $documents = $collection->documents();
+
+        $data = [];
+
+        foreach ($documents as $document) {
+            if ($document->exists()) {
+                $docData = $document->data();
+                $data[] = array_merge($docData, ['id' => $document->id()]);
+            }
+        }
+
+        return $data;
+    }
+
+     public function deleteAbsensi($id)
+    {
+        $collection = $this->db->collection('absensi');
+        $collection->document((string)$id)->delete();
+    }
 }
