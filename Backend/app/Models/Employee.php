@@ -30,6 +30,16 @@ class Employee extends Model
         'password',
     ];
 
+
+    public function setPasswordAttribute($value)
+    {
+        if (!str_starts_with($value, '$2y$')) {
+            $this->attributes['password'] = Hash::make($value);
+        } else {
+            $this->attributes['password'] = $value;
+        }
+    }
+
     protected static function booted()
     {
         // Create
@@ -40,7 +50,7 @@ class Employee extends Model
                 'name' => $employee->name,
                 'username' => $employee->username,
                 'email' => $employee->email,
-                'password' => Hash::make($employee->password),
+                'password' => $employee->password,
                 'status' => $employee->status,
                 'provider' => $employee->provider,
                 'createdAt' => now()->toISOString(),

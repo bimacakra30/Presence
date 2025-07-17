@@ -26,6 +26,7 @@ class AdminPanelProvider extends PanelProvider
             ->default()
             ->id('admin')
             ->path('admin')
+            ->brandName('Presence Admin')
             ->login()
             ->colors([
                 'danger' => Color::Rose,
