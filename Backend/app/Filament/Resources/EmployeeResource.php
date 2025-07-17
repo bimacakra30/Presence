@@ -9,6 +9,7 @@ use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
+use App\Filament\Widgets\StatsOverview;
 
 class EmployeeResource extends Resource
 {
@@ -180,5 +181,12 @@ class EmployeeResource extends Resource
     public static function getNavigationBadge(): ?string
     {
         return static::getModel()::count();
+    }
+
+    public static function getWidgets(): array
+    {
+        return [
+            StatsOverview::class,
+        ];
     }
 }

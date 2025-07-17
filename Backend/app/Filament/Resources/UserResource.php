@@ -6,10 +6,12 @@ use App\Filament\Resources\UserResource\Pages;
 use App\Filament\Resources\UserResource\RelationManagers;
 use App\Models\User;
 use Filament\Forms;
+use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
+use Filament\Tables\Columns\ImageColumn;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
 
@@ -23,6 +25,13 @@ class UserResource extends Resource
     {
         return $form
             ->schema([
+                 FileUpload::make('photo')
+                    ->label('Foto Profile')
+                    ->directory('profile-images')
+                    ->image()
+                    ->imagePreviewHeight('100')
+                    ->previewable()
+                    ->nullable(),
                 Forms\Components\TextInput::make('name')
                     ->required()
                     ->maxLength(255),
@@ -41,6 +50,11 @@ class UserResource extends Resource
     {
         return $table
             ->columns([
+                ImageColumn::make('photo')
+                    ->label('Foto Profile')
+                    ->getStateUsing(fn($record) => asset('storage/' . $record->photo))
+                    ->circular()
+                    ->size(50),
                 Tables\Columns\TextColumn::make('name')
                     ->searchable(),
                 Tables\Columns\TextColumn::make('email')
