@@ -21,11 +21,24 @@ class Employee extends Model
         'password',
         'address',
         'date_of_birth',
-        'salary',
-        'provider',
         'status',
+        'provider',
         'firestore_id',
     ];
+
+    protected $hidden = [
+        'password',
+    ];
+
+
+    public function setPasswordAttribute($value)
+    {
+        if (!str_starts_with($value, '$2y$')) {
+            $this->attributes['password'] = Hash::make($value);
+        } else {
+            $this->attributes['password'] = $value;
+        }
+    }
 
     protected static function booted()
     {
@@ -37,7 +50,7 @@ class Employee extends Model
                 'name' => $employee->name,
                 'username' => $employee->username,
                 'email' => $employee->email,
-                'password' => Hash::make($employee->password),
+                'password' => $employee->password,
                 'status' => $employee->status,
                 'provider' => $employee->provider,
                 'createdAt' => now()->toISOString(),
@@ -60,6 +73,7 @@ class Employee extends Model
                 $data = [
                     'email' => $employee->email,
                     'status' => $employee->status,
+                    'provider' => $employee->provider,
                 ];
 
                 $service->updateUser($employee->firestore_id, $data);
@@ -84,5 +98,10 @@ class Employee extends Model
     public function salaries()
     {
         return $this->hasMany(EmployeeSalary::class, 'employee_id');
+    }
+
+    public function presences()
+    {
+        return $this->hasMany(Presence::class, 'employee_id');
     }
 }

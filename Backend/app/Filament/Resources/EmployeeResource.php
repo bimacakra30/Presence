@@ -9,12 +9,14 @@ use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
+use App\Filament\Widgets\StatsOverview;
 
 class EmployeeResource extends Resource
 {
     protected static ?string $model = Employee::class;
     protected static ?string $navigationGroup = 'Management';
-    protected static ?string $navigationLabel = 'Employees Management';
+    protected static ?string $navigationBadgeTooltip = 'Jumlah Karyawan';
+    protected static ?string $navigationLabel = 'Karyawan';
     protected static ?string $navigationIcon = 'heroicon-o-users';
 
     public static function form(Form $form): Form
@@ -70,12 +72,6 @@ class EmployeeResource extends Resource
                     ->label('Date of Birth')
                     ->disabled(fn ($context) => $context === 'edit')
                     ->nullable(),
-                Forms\Components\TextInput::make('salary')
-                    ->label('Salary')
-                    ->numeric()
-                    ->prefix('Rp')
-                    ->nullable(),
-
                 Forms\Components\Select::make('status')
                     ->label('Status')
                     ->required()
@@ -95,6 +91,8 @@ class EmployeeResource extends Resource
                         'twitter' => 'Twitter',
                         'github' => 'GitHub',
                     ])
+                    ->default('google')
+                    ->required()
                     ->nullable(),
             ]);
     }
@@ -127,18 +125,9 @@ class EmployeeResource extends Resource
                     ->date()
                     ->sortable(),
 
-                Tables\Columns\TextColumn::make('position')
-                    ->label('Position')
-                    ->searchable(),
-
-                Tables\Columns\TextColumn::make('salary')
-                    ->label('Salary')
-                    ->money('IDR')
-                    ->sortable(),
-
-                Tables\Columns\TextColumn::make('provider')
+                Tables\Columns\ViewColumn::make('provider')
                     ->label('Provider')
-                    ->searchable(),
+                    ->view('filament.components.provider-icon'),
 
                 Tables\Columns\TextColumn::make('status')
                     ->label('Status')
@@ -186,6 +175,18 @@ class EmployeeResource extends Resource
             'index' => Pages\ListEmployees::route('/'),
             'create' => Pages\CreateEmployee::route('/create'),
             'edit' => Pages\EditEmployee::route('/{record}/edit'),
+        ];
+    }
+
+    public static function getNavigationBadge(): ?string
+    {
+        return static::getModel()::count();
+    }
+
+    public static function getWidgets(): array
+    {
+        return [
+            StatsOverview::class,
         ];
     }
 }
