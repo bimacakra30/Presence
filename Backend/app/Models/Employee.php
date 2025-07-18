@@ -13,6 +13,7 @@ class Employee extends Model
     use HasFactory;
 
     protected $fillable = [
+        'uid',
         'photo',
         'name',
         'username',
@@ -43,10 +44,17 @@ class Employee extends Model
     protected static function booted()
     {
         // Create
+
+        static::creating(function ($employee) {
+            if (!$employee->uid) {
+                $employee->uid = (string) \Illuminate\Support\Str::uuid();
+            }
+        });
         static::created(function ($employee) {
             $service = new \App\Services\FirestoreService();
 
             $data = [
+                'uid' => $employee->uid,
                 'name' => $employee->name,
                 'username' => $employee->username,
                 'email' => $employee->email,

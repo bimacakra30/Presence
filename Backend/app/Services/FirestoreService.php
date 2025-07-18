@@ -18,31 +18,31 @@ class FirestoreService
 
     public function getCollection()
     {
-        return $this->db->collection('users');
+        return $this->db->collection('employees');
     }
 
 
     public function createUser($id, $data)
     {
-        $collection = $this->db->collection('users');
+        $collection = $this->db->collection('employees');
         $collection->document((string)$id)->set($data);
     }
 
     public function updateUser($id, $data)
     {
-        $collection = $this->db->collection('users');
+        $collection = $this->db->collection('employees');
         $collection->document((string)$id)->set($data, ['merge' => true]);
     }
 
     public function deleteUser($id)
     {
-        $collection = $this->db->collection('users');
+        $collection = $this->db->collection('employees');
         $collection->document((string)$id)->delete();
     }
 
     public function getUsers()
     {
-        $collection = $this->db->collection('users');
+        $collection = $this->db->collection('employees');
         $documents = $collection->documents();
 
         $users = [];
@@ -59,28 +59,70 @@ class FirestoreService
 
     public function getAbsensi()
     {
-        $firestore = new FirestoreClient([
-            'projectId' => 'presence-app-735f3', // Ganti sesuai project ID kamu
-        ]);
+        $collection = $this->db->collection('absensi')->documents();
+        $absensi = [];
 
-        $collection = $firestore->collection('absensi');
-        $documents = $collection->documents();
-
-        $data = [];
-
-        foreach ($documents as $document) {
+        foreach ($collection as $document) {
             if ($document->exists()) {
-                $docData = $document->data();
-                $data[] = array_merge($docData, ['id' => $document->id()]);
+                $data = $document->data();
+
+                // Pastikan kita tidak menimpa key penting dan menambahkan ID dokumen
+                $absensi[] = array_merge($data, [
+                    'firestore_id' => $document->id(),
+                ]);
             }
         }
 
-        return $data;
+        return $absensi;
     }
 
-     public function deleteAbsensi($id)
+
+
+     public function deleteAbsensi($documentId)
     {
         $collection = $this->db->collection('absensi');
+        $collection->document($documentId)->delete();
+    }
+
+
+    public function getCollectionPosition()
+    {
+        return $this->db->collection('employee_positions');
+    }
+
+
+    public function createUserPosition($id, $data)
+    {
+        $collection = $this->db->collection('employee_positions');
+        $collection->document((string)$id)->set($data);
+    }
+
+    public function updateUserPosition($id, $data)
+    {
+        $collection = $this->db->collection('employee_positions');
+        $collection->document((string)$id)->set($data, ['merge' => true]);
+    }
+
+    public function deleteUserPosition($id)
+    {
+        $collection = $this->db->collection('employee_positions');
         $collection->document((string)$id)->delete();
+    }
+
+    public function getUsersPosition()
+    {
+        $collection = $this->db->collection('employee_positions');
+        $documents = $collection->documents();
+
+        $users = [];
+        foreach ($documents as $document) {
+            if ($document->exists()) {
+                $data = $document->data();
+                $data['id'] = $document->id();
+                $users[] = $data;
+            }
+        }
+
+        return $users;
     }
 }

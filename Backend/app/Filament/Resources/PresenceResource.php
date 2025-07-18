@@ -52,14 +52,18 @@ class PresenceResource extends Resource
                 Tables\Columns\TextColumn::make('tanggal')
                     ->date()
                     ->sortable(),
+                    Tables\Columns\TextColumn::make('clock_in')
+                        ->label('Jam Masuk')
+                        ->searchable(),
                 Tables\Columns\ImageColumn::make('foto_clock_in')
+                    ->label('Dokumentasi Kehadiran')
                     ->height(200)
                     ->searchable(),
-                Tables\Columns\TextColumn::make('clock_in'),
+                Tables\Columns\TextColumn::make('clock_out')
+                    ->label('Jam Pulang'),
                 Tables\Columns\ImageColumn::make('foto_clock_out')
-                    ->height(200)
-                    ->searchable(),
-                Tables\Columns\TextColumn::make('clock_out'),
+                    ->label('Dokumentasi Pulang')
+                    ->height(200),
                 Tables\Columns\TextColumn::make('created_at')
                     ->dateTime()
                     ->sortable()
@@ -68,8 +72,6 @@ class PresenceResource extends Resource
                     ->dateTime()
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
-                Tables\Columns\TextColumn::make('uid')
-                    ->searchable(),
             ])
             ->filters([
                 //
@@ -79,8 +81,8 @@ class PresenceResource extends Resource
                     Tables\Actions\DeleteBulkAction::make()
                         ->label('Force Delete')
                         ->requiresConfirmation()
-                        ->action(fn ($records) => $records->each->delete()),
-                ]),
+                        ->action(fn ($records) => $records->each->forceDelete()),
+                ])
             ]);
     }
 

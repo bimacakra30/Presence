@@ -50,7 +50,7 @@ class ListPresences extends ListRecords
                         );
                     }
                     Notification::make()
-                    ->title('✅ Data presensi berhasil disinkronkan!')
+                    ->title('Data presensi berhasil disinkronkan!')
                     ->success()
                     ->send();
                 }),

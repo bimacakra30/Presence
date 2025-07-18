@@ -10,6 +10,7 @@ class Presence extends Model
     use HasFactory;
     protected $fillable = [
         'uid',
+        'firestore_id',
         'nama',
         'tanggal',
         'clock_in',
@@ -20,11 +21,12 @@ class Presence extends Model
 
     protected static function booted()
     {
-       static::deleted(function ($presence) {
-            if ($presence->uid) {
+        static::deleted(function ($presence) {
+            if ($presence->firestore_id) {
                 $service = new \App\Services\FirestoreService();
-                $service->deleteAbsensi($presence->uid);
+                $service->deleteAbsensi($presence->firestore_id);
             }
         });
     }
+
 }

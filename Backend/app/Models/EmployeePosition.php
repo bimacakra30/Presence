@@ -31,7 +31,7 @@ class EmployeePosition extends Model
                 'end_date' => $employee->end_date,
             ];
 
-            $collection = $service->getCollection();
+            $collection = $service->getCollectionPosition();
             $docRef = $collection->add($data);
 
             $firestoreId = $docRef->id();
@@ -52,7 +52,7 @@ class EmployeePosition extends Model
                     'end_date' => $employee->end_date ? $employee->end_date->toISOString() : null,
                 ];
 
-                $service->updateUser($employee->firestore_id, $data);
+                $service->updateUserPosition($employee->firestore_id, $data);
             }
         });
 
@@ -62,7 +62,7 @@ class EmployeePosition extends Model
 
             if ($employee->firestore_id) {
                 $service = new \App\Services\FirestoreService();
-                $service->deleteUser($employee->firestore_id);
+                $service->deleteUserPosition($employee->firestore_id);
             }
         });
     }
