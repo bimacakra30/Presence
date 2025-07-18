@@ -88,7 +88,7 @@ class _LoginPageState extends State<LoginPage> {
 
     try {
       final googleSignIn = GoogleSignIn();
-      await googleSignIn.signOut();
+      await googleSignIn.signOut(); // Optional: memastikan login ulang
 
       final GoogleSignInAccount? googleUser = await googleSignIn.signIn();
       if (googleUser == null) {
@@ -97,6 +97,8 @@ class _LoginPageState extends State<LoginPage> {
       }
 
       final email = googleUser.email;
+
+      // Cek apakah email terdaftar di Firestore
       final query = await FirebaseFirestore.instance
           .collection('users')
           .where('email', isEqualTo: email)
@@ -117,14 +119,21 @@ class _LoginPageState extends State<LoginPage> {
         idToken: googleAuth.idToken,
       );
 
+      // Login ke Firebase Auth
       await FirebaseAuth.instance.signInWithCredential(credential);
+
+      // Simpan nama dan email ke SharedPreferences
+      final userDoc = query.docs.first;
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('name', userDoc['name']);
+      await prefs.setString('email', userDoc['email']);
 
       await Future.delayed(const Duration(seconds: 2));
 
       Navigator.pushAndRemoveUntil(
         context,
         MaterialPageRoute(builder: (_) => const HomePage()),
-        (route) => false,
+            (route) => false,
       );
     } catch (e) {
       Navigator.pop(context);

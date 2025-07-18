@@ -17,11 +17,14 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   String username = "Pengguna";
+  DateTime? clockInTime;
+  DateTime? clockOutTime;
 
   @override
   void initState() {
     super.initState();
     fetchUsername();
+    fetchPresensiHariIni();
   }
 
   Future<void> fetchUsername() async {
@@ -30,6 +33,33 @@ class _HomePageState extends State<HomePage> {
     if (savedName != null && savedName.isNotEmpty) {
       setState(() {
         username = savedName;
+      });
+    }
+  }
+
+  Future<void> fetchPresensiHariIni() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    final now = DateTime.now();
+    final todayStart = DateTime(now.year, now.month, now.day);
+
+    final query = await FirebaseFirestore.instance
+        .collection('absensi')
+        .where('uid', isEqualTo: user.uid)
+        .where('tanggal', isEqualTo: todayStart.toIso8601String())
+        .limit(1)
+        .get();
+
+    if (query.docs.isNotEmpty) {
+      final data = query.docs.first.data();
+      setState(() {
+        if (data['clockIn'] != null) {
+          clockInTime = DateTime.parse(data['clockIn']);
+        }
+        if (data['clockOut'] != null) {
+          clockOutTime = DateTime.parse(data['clockOut']);
+        }
       });
     }
   }
@@ -109,6 +139,7 @@ class _HomePageState extends State<HomePage> {
         const SnackBar(content: Text('Pengambilan foto dibatalkan')),
       );
     }
+    await fetchPresensiHariIni();
   }
 
   @override
@@ -233,22 +264,28 @@ class _HomePageState extends State<HomePage> {
                       ),
                     ),
                     const SizedBox(height: 4),
-                    const Text("Masuk : -", style: TextStyle(color: Colors.blue)),
+                    Text(
+                      "Masuk : ${clockInTime != null ? DateFormat.Hm().format(clockInTime!) : "-"}",
+                      style: const TextStyle(color: Colors.blue),
+                    ),
                   ],
                 ),
               ),
               const SizedBox(width: 12),
               Column(
                 crossAxisAlignment: CrossAxisAlignment.end,
-                children: const [
-                  Text("Jadwal", style: TextStyle(fontSize: 13)),
-                  SizedBox(height: 4),
-                  Text(
+                children: [
+                  const Text("Jadwal", style: TextStyle(fontSize: 13)),
+                  const SizedBox(height: 4),
+                  const Text(
                     "08.00 - 17.00 WIB",
                     style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
                   ),
-                  SizedBox(height: 4),
-                  Text("Pulang : -", style: TextStyle(color: Colors.blue)),
+                  const SizedBox(height: 4),
+                  Text(
+                    "Pulang : ${clockOutTime != null ? DateFormat.Hm().format(clockOutTime!) : "-"}",
+                    style: const TextStyle(color: Colors.blue),
+                  ),
                 ],
               ),
             ],
