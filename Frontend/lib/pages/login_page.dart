@@ -31,9 +31,13 @@ class _LoginPageState extends State<LoginPage> {
     setState(() {
       usernameError = username.isEmpty ? 'Username wajib diisi' : null;
       passwordError = password.isEmpty ? 'Password wajib diisi' : null;
+      isLoading = true;
     });
 
-    if (usernameError != null || passwordError != null) return;
+    if (usernameError != null || passwordError != null) {
+      setState(() => isLoading = false);
+      return;
+    }
 
     Navigator.push(
       context,
@@ -42,14 +46,17 @@ class _LoginPageState extends State<LoginPage> {
 
     try {
       final query = await FirebaseFirestore.instance
-          .collection('users')
+          .collection('employees')
           .where('username', isEqualTo: username)
           .limit(1)
           .get();
 
       if (query.docs.isEmpty) {
         Navigator.pop(context);
-        setState(() => usernameError = "Username tidak ditemukan");
+        setState(() {
+          usernameError = "Username tidak ditemukan";
+          isLoading = false;
+        });
         return;
       }
 
@@ -59,15 +66,29 @@ class _LoginPageState extends State<LoginPage> {
 
       if (!isMatch) {
         Navigator.pop(context);
-        setState(() => passwordError = "Password salah");
+        setState(() {
+          passwordError = "Password salah";
+          isLoading = false;
+        });
         return;
       }
 
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('name', userDoc['name']);
-      await prefs.setString('email', userDoc['email']); // Tambahkan baris ini
+      await prefs.setString('name', userDoc['name'] ?? '');
+      await prefs.setString('email', userDoc['email'] ?? '');
+      await prefs.setString('username', userDoc['username'] ?? '');
 
-      await Future.delayed(const Duration(seconds: 2));
+      if (!userDoc.data().containsKey('uid') || userDoc['uid'] == null) {
+        Navigator.pop(context);
+        setState(() {
+          usernameError = "Akun tidak valid (uid tidak ditemukan)";
+          isLoading = false;
+        });
+        return;
+      }
+      await prefs.setString('uid', userDoc['uid']);
+
+      await Future.delayed(const Duration(seconds: 1));
 
       Navigator.pushAndRemoveUntil(
         context,
@@ -76,7 +97,10 @@ class _LoginPageState extends State<LoginPage> {
       );
     } catch (e) {
       Navigator.pop(context);
-      setState(() => passwordError = "Terjadi kesalahan: ${e.toString()}");
+      setState(() {
+        passwordError = "Terjadi kesalahan: ${e.toString()}";
+        isLoading = false;
+      });
     }
   }
 
@@ -100,7 +124,7 @@ class _LoginPageState extends State<LoginPage> {
 
       // Cek apakah email terdaftar di Firestore
       final query = await FirebaseFirestore.instance
-          .collection('users')
+          .collection('employees')
           .where('email', isEqualTo: email)
           .limit(1)
           .get();

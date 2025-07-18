@@ -5,8 +5,11 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../components/utils/cloudinary_service.dart';
+import '../utils/cloudinary_service.dart';
+import '../components/home_widgets.dart';
+import '../utils/presensi_utils.dart';
 import 'login_page.dart';
+import 'settings_page.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -38,21 +41,8 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<void> fetchPresensiHariIni() async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) return;
-
-    final now = DateTime.now();
-    final todayStart = DateTime(now.year, now.month, now.day);
-
-    final query = await FirebaseFirestore.instance
-        .collection('absensi')
-        .where('uid', isEqualTo: user.uid)
-        .where('tanggal', isEqualTo: todayStart.toIso8601String())
-        .limit(1)
-        .get();
-
-    if (query.docs.isNotEmpty) {
-      final data = query.docs.first.data();
+    final data = await fetchPresensiHariIniUtil();
+    if (data != null) {
       setState(() {
         if (data['clockIn'] != null) {
           clockInTime = DateTime.parse(data['clockIn']);
@@ -78,7 +68,9 @@ class _HomePageState extends State<HomePage> {
       final imageUrl = await CloudinaryService.uploadImageToCloudinary(file);
 
       if (imageUrl != null) {
-        final user = FirebaseAuth.instance.currentUser;
+        final prefs = await SharedPreferences.getInstance();
+        final uid =
+            FirebaseAuth.instance.currentUser?.uid ?? prefs.getString('uid');
         final now = DateTime.now();
         final todayStart = DateTime(now.year, now.month, now.day);
 
@@ -86,7 +78,7 @@ class _HomePageState extends State<HomePage> {
 
         // Cari data absensi hari ini berdasarkan uid
         final existingQuery = await absensiRef
-            .where('uid', isEqualTo: user?.uid)
+            .where('uid', isEqualTo: uid)
             .where('tanggal', isEqualTo: todayStart.toIso8601String())
             .limit(1)
             .get();
@@ -94,16 +86,16 @@ class _HomePageState extends State<HomePage> {
         if (existingQuery.docs.isEmpty) {
           // Belum ada Clock In → Simpan Clock In
           await absensiRef.add({
-            'uid': user?.uid,
+            'uid': uid,
             'nama': username,
             'tanggal': todayStart.toIso8601String(),
             'clockIn': now.toIso8601String(),
             'fotoClockIn': imageUrl,
           });
 
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Berhasil Clock In')),
-          );
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(const SnackBar(content: Text('Berhasil Clock In')));
         } else {
           // Sudah Clock In → Periksa apakah sudah Clock Out
           final doc = existingQuery.docs.first;
@@ -116,12 +108,14 @@ class _HomePageState extends State<HomePage> {
               'fotoClockOut': imageUrl,
             });
 
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Berhasil Clock Out')),
-            );
+            ScaffoldMessenger.of(
+              context,
+            ).showSnackBar(const SnackBar(content: Text('Berhasil Clock Out')));
           } else if (now.hour < 17) {
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Clock Out hanya tersedia setelah jam 5 sore')),
+              const SnackBar(
+                content: Text('Clock Out hanya tersedia setelah jam 5 sore'),
+              ),
             );
           } else {
             ScaffoldMessenger.of(context).showSnackBar(
@@ -130,9 +124,9 @@ class _HomePageState extends State<HomePage> {
           }
         }
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Gagal upload foto')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Gagal upload foto')));
       }
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -207,22 +201,15 @@ class _HomePageState extends State<HomePage> {
           ),
           GestureDetector(
             onTap: () {
-              showModalBottomSheet(
-                context: context,
-                shape: const RoundedRectangleBorder(
-                  borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-                ),
-                builder: (context) => _ProfileModal(name: username),
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const SettingsPage()),
               );
             },
             child: CircleAvatar(
               radius: 28,
               backgroundColor: Colors.white,
-              child: Icon(
-                Icons.person,
-                size: 30,
-                color: Colors.grey[800],
-              ),
+              child: Icon(Icons.person, size: 30, color: Colors.grey[800]),
             ),
           ),
         ],
@@ -238,11 +225,7 @@ class _HomePageState extends State<HomePage> {
         color: Colors.white,
         borderRadius: BorderRadius.circular(20),
         boxShadow: const [
-          BoxShadow(
-            color: Colors.black12,
-            blurRadius: 8,
-            offset: Offset(0, 4),
-          ),
+          BoxShadow(color: Colors.black12, blurRadius: 8, offset: Offset(0, 4)),
         ],
       ),
       child: Column(
@@ -257,7 +240,10 @@ class _HomePageState extends State<HomePage> {
                     const Text("Tanggal", style: TextStyle(fontSize: 13)),
                     const SizedBox(height: 4),
                     Text(
-                      DateFormat('EEEE, dd MMMM yyyy', 'id_ID').format(DateTime.now()),
+                      DateFormat(
+                        'EEEE, dd MMMM yyyy',
+                        'id_ID',
+                      ).format(DateTime.now()),
                       style: const TextStyle(
                         fontWeight: FontWeight.bold,
                         fontSize: 15,
@@ -291,14 +277,21 @@ class _HomePageState extends State<HomePage> {
             ],
           ),
           const Divider(height: 32),
-          const Text("Rekab Presensi Bulan Ini", style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+          const Text(
+            "Rekab Presensi Bulan Ini",
+            style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+          ),
           const SizedBox(height: 12),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: const [
-              _StatusInfo(label: "Hadir", count: "7 Hari", color: Colors.green),
-              _StatusInfo(label: "Izin", count: "0 Hari", color: Colors.orange),
-              _StatusInfo(label: "Tidak Hadir", count: "0 Hari", color: Colors.red),
+              StatusInfo(label: "Hadir", count: "7 Hari", color: Colors.green),
+              StatusInfo(label: "Izin", count: "0 Hari", color: Colors.orange),
+              StatusInfo(
+                label: "Tidak Hadir",
+                count: "0 Hari",
+                color: Colors.red,
+              ),
             ],
           ),
         ],
@@ -325,7 +318,11 @@ class _HomePageState extends State<HomePage> {
             SizedBox(height: 4),
             Text(
               "Presensi Sekarang",
-              style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+                fontSize: 16,
+              ),
             ),
             Text(
               "(Pastikan berada di Lingkungan kantor)",
@@ -342,7 +339,10 @@ class _HomePageState extends State<HomePage> {
       padding: EdgeInsets.symmetric(horizontal: 24),
       child: Align(
         alignment: Alignment.centerLeft,
-        child: Text("Menu Utama", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+        child: Text(
+          "Menu Utama",
+          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+        ),
       ),
     );
   }
@@ -355,84 +355,11 @@ class _HomePageState extends State<HomePage> {
         runSpacing: 16,
         spacing: 6,
         children: const [
-          _MenuIcon(icon: Icons.assignment_outlined, label: "Riwayat Presensi"),
-          _MenuIcon(icon: Icons.location_on_outlined, label: "Lokasi"),
-          _MenuIcon(icon: Icons.mail_outline, label: "Pengajuan Izin"),
-          _MenuIcon(icon: Icons.event_note_outlined, label: "Aktivitas"),
-          _MenuIcon(icon: Icons.attach_money_outlined, label: "Informasi Gaji"),
-        ],
-      ),
-    );
-  }
-}
-
-class _StatusInfo extends StatelessWidget {
-  final String label;
-  final String count;
-  final Color color;
-
-  const _StatusInfo({required this.label, required this.count, required this.color});
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Text(label, style: TextStyle(color: color, fontWeight: FontWeight.bold)),
-        const SizedBox(height: 4),
-        Text(count),
-      ],
-    );
-  }
-}
-
-class _MenuIcon extends StatelessWidget {
-  final IconData icon;
-  final String label;
-
-  const _MenuIcon({required this.icon, required this.label});
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: [
-        CircleAvatar(
-          backgroundColor: Colors.teal.shade100,
-          child: Icon(icon, color: Colors.teal.shade800),
-        ),
-        const SizedBox(height: 4),
-        Text(label, textAlign: TextAlign.center),
-      ],
-    );
-  }
-}
-
-class _ProfileModal extends StatelessWidget {
-  final String name;
-
-  const _ProfileModal({required this.name});
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text("Profil Pengguna", style: Theme.of(context).textTheme.titleLarge),
-          const SizedBox(height: 12),
-          Text("Nama: $name"),
-          const SizedBox(height: 20),
-          ElevatedButton(
-            onPressed: () async {
-              await FirebaseAuth.instance.signOut();
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(builder: (_) => const LoginPage()),
-              );
-            },
-            child: const Text("Logout"),
-          ),
+          MenuIcon(icon: Icons.assignment_outlined, label: "Riwayat Presensi"),
+          MenuIcon(icon: Icons.location_on_outlined, label: "Lokasi"),
+          MenuIcon(icon: Icons.mail_outline, label: "Pengajuan Izin"),
+          MenuIcon(icon: Icons.event_note_outlined, label: "Aktivitas"),
+          MenuIcon(icon: Icons.attach_money_outlined, label: "Informasi Gaji"),
         ],
       ),
     );
