@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
+import '../components/profile_avatar.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../utils/cloudinary_service.dart';
 import '../components/home_widgets.dart';
@@ -144,13 +145,6 @@ class _HomePageState extends State<HomePage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: PreferredSize(
-        preferredSize: const Size.fromHeight(10),
-        child: AppBar(
-          backgroundColor: const Color.fromARGB(195, 0, 159, 227),
-          elevation: 0,
-        ),
-      ),
       body: SafeArea(
         child: ListView(
           padding: EdgeInsets.only(
@@ -211,11 +205,7 @@ class _HomePageState extends State<HomePage> {
                 MaterialPageRoute(builder: (_) => const SettingsPage()),
               );
             },
-            child: CircleAvatar(
-              radius: 28,
-              backgroundColor: Colors.white,
-              child: Icon(Icons.person, size: 30, color: Colors.grey[800]),
-            ),
+            child: const ProfileAvatar(),
           ),
         ],
       ),
@@ -339,34 +329,36 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  Widget _buildMenuUtamaTitle() {
-    return const Padding(
-      padding: EdgeInsets.symmetric(horizontal: 24),
-      child: Align(
-        alignment: Alignment.centerLeft,
-        child: Text(
-          "Menu Utama",
-          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-        ),
+Widget _buildMenuUtamaTitle() {
+  return Padding(
+    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+    child: Text(
+      "Menu Utama",
+      style: const TextStyle(
+        fontSize: 20, // Ukuran font lebih besar
+        fontWeight: FontWeight.bold,
+        color: Colors.black, // Warna teks
       ),
-    );
-  }
+    ),
+  );
+}
 
-  Widget _buildMenuIcons() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 24),
-      child: Wrap(
-        alignment: WrapAlignment.spaceBetween,
-        runSpacing: 16,
-        spacing: 6,
-        children: const [
-          MenuIcon(icon: Icons.assignment_outlined, label: "Riwayat Presensi"),
-          MenuIcon(icon: Icons.location_on_outlined, label: "Lokasi"),
-          MenuIcon(icon: Icons.mail_outline, label: "Pengajuan Izin"),
-          MenuIcon(icon: Icons.event_note_outlined, label: "Aktivitas"),
-          MenuIcon(icon: Icons.attach_money_outlined, label: "Informasi Gaji"),
-        ],
-      ),
-    );
-  }
+Widget _buildMenuIcons() {
+  return Padding(
+    padding: const EdgeInsets.symmetric(horizontal: 24),
+    child: GridView.count(
+      crossAxisCount: 2, // Mengatur jumlah kolom
+      shrinkWrap: true, // Menghindari overflow
+      physics: const NeverScrollableScrollPhysics(), // Menonaktifkan scroll
+      childAspectRatio: 1.2, // Rasio aspek untuk ikon
+      children: const [
+        MenuIcon(icon: Icons.assignment_outlined, label: "Riwayat Presensi"),
+        MenuIcon(icon: Icons.location_on_outlined, label: "Lokasi"),
+        MenuIcon(icon: Icons.mail_outline, label: "Pengajuan Izin"),
+        MenuIcon(icon: Icons.event_note_outlined, label: "Aktivitas"),
+        MenuIcon(icon: Icons.attach_money_outlined, label: "Informasi Gaji"),
+      ],
+    ),
+  );
+}
 }
