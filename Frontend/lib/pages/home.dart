@@ -8,7 +8,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../utils/cloudinary_service.dart';
 import '../components/home_widgets.dart';
 import '../utils/presensi_utils.dart';
-import 'login_page.dart';
 import 'settings_page.dart';
 
 class HomePage extends StatefulWidget {
@@ -65,9 +64,14 @@ class _HomePageState extends State<HomePage> {
         const SnackBar(content: Text('Mengupload foto ke Cloudinary...')),
       );
 
-      final imageUrl = await CloudinaryService.uploadImageToCloudinary(file);
+      final uploadResult = await CloudinaryService.uploadImageToCloudinary(
+        file,
+      );
 
-      if (imageUrl != null) {
+      if (uploadResult != null) {
+        final imageUrl = uploadResult['url'];
+        final publicId = uploadResult['public_id'];
+
         final prefs = await SharedPreferences.getInstance();
         final uid =
             FirebaseAuth.instance.currentUser?.uid ?? prefs.getString('uid');
@@ -76,7 +80,6 @@ class _HomePageState extends State<HomePage> {
 
         final absensiRef = FirebaseFirestore.instance.collection('absensi');
 
-        // Cari data absensi hari ini berdasarkan uid
         final existingQuery = await absensiRef
             .where('uid', isEqualTo: uid)
             .where('tanggal', isEqualTo: todayStart.toIso8601String())
@@ -84,28 +87,29 @@ class _HomePageState extends State<HomePage> {
             .get();
 
         if (existingQuery.docs.isEmpty) {
-          // Belum ada Clock In → Simpan Clock In
+          // Clock In
           await absensiRef.add({
             'uid': uid,
             'nama': username,
             'tanggal': todayStart.toIso8601String(),
             'clockIn': now.toIso8601String(),
             'fotoClockIn': imageUrl,
+            'fotoClockInPublicId': publicId,
           });
 
           ScaffoldMessenger.of(
             context,
           ).showSnackBar(const SnackBar(content: Text('Berhasil Clock In')));
         } else {
-          // Sudah Clock In → Periksa apakah sudah Clock Out
+          // Clock Out
           final doc = existingQuery.docs.first;
           final data = doc.data();
 
           if (data['clockOut'] == null && now.hour >= 17) {
-            // Simpan Clock Out
             await absensiRef.doc(doc.id).update({
               'clockOut': now.toIso8601String(),
               'fotoClockOut': imageUrl,
+              'fotoClockOutPublicId': publicId,
             });
 
             ScaffoldMessenger.of(
@@ -133,6 +137,7 @@ class _HomePageState extends State<HomePage> {
         const SnackBar(content: Text('Pengambilan foto dibatalkan')),
       );
     }
+
     await fetchPresensiHariIni();
   }
 

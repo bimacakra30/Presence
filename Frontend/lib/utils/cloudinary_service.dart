@@ -3,7 +3,7 @@ import 'dart:io';
 import 'package:http/http.dart' as http;
 
 class CloudinaryService {
-  static Future<String?> uploadImageToCloudinary(File imageFile) async {
+  static Future<Map<String, dynamic>?> uploadImageToCloudinary(File imageFile) async {
     const cloudName = 'dyf9r2al9';
     const uploadPreset = 'Absensi';
 
@@ -18,7 +18,10 @@ class CloudinaryService {
     if (response.statusCode == 200) {
       final respStr = await response.stream.bytesToString();
       final data = json.decode(respStr);
-      return data['secure_url'];
+      return {
+        'url': data['secure_url'],
+        'public_id': data['public_id']
+      };
     } else {
       print('Upload failed: ${response.statusCode}');
       return null;
