@@ -22,6 +22,7 @@ class _HomePageState extends State<HomePage> {
   String username = "Pengguna";
   DateTime? clockInTime;
   DateTime? clockOutTime;
+  bool? terlambatStatus;
 
   @override
   void initState() {
@@ -41,105 +42,130 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<void> fetchPresensiHariIni() async {
-    final data = await fetchPresensiHariIniUtil();
-    if (data != null) {
-      setState(() {
-        if (data['clockIn'] != null) {
-          clockInTime = DateTime.parse(data['clockIn']);
-        }
-        if (data['clockOut'] != null) {
-          clockOutTime = DateTime.parse(data['clockOut']);
-        }
-      });
+    try {
+      final data = await fetchPresensiHariIniUtil();
+
+      if (data != null) {
+        setState(() {
+          if (data['clockIn'] != null) {
+            clockInTime = DateTime.parse(data['clockIn']);
+          }
+          if (data['clockOut'] != null) {
+            clockOutTime = DateTime.parse(data['clockOut']);
+          }
+          if (data['terlambat'] != null) {
+            terlambatStatus = data['terlambat'];
+          }
+        });
+      }
+    } catch (e) {
+      debugPrint('Error fetching presensi: $e');
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Gagal memuat data presensi: $e')));
     }
   }
 
   Future<void> _ambilFotoDanUpload() async {
     final picker = ImagePicker();
-    final XFile? photo = await picker.pickImage(source: ImageSource.camera);
+    try {
+      final XFile? photo = await picker.pickImage(source: ImageSource.camera);
 
-    if (photo != null) {
+      if (photo == null) {
+        _showMessage('Pengambilan foto dibatalkan');
+        return;
+      }
+
       final file = File(photo.path);
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Mengupload foto ke Cloudinary...')),
-      );
+      _showMessage('Mengupload foto ke Cloudinary...');
 
       final uploadResult = await CloudinaryService.uploadImageToCloudinary(
         file,
       );
 
-      if (uploadResult != null) {
-        final imageUrl = uploadResult['url'];
-        final publicId = uploadResult['public_id'];
-
-        final prefs = await SharedPreferences.getInstance();
-        final uid =
-            FirebaseAuth.instance.currentUser?.uid ?? prefs.getString('uid');
-        final now = DateTime.now();
-        final todayStart = DateTime(now.year, now.month, now.day);
-
-        final absensiRef = FirebaseFirestore.instance.collection('absensi');
-
-        final existingQuery = await absensiRef
-            .where('uid', isEqualTo: uid)
-            .where('tanggal', isEqualTo: todayStart.toIso8601String())
-            .limit(1)
-            .get();
-
-        if (existingQuery.docs.isEmpty) {
-          // Clock In
-          await absensiRef.add({
-            'uid': uid,
-            'nama': username,
-            'tanggal': todayStart.toIso8601String(),
-            'clockIn': now.toIso8601String(),
-            'fotoClockIn': imageUrl,
-            'fotoClockInPublicId': publicId,
-          });
-
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(const SnackBar(content: Text('Berhasil Clock In')));
-        } else {
-          // Clock Out
-          final doc = existingQuery.docs.first;
-          final data = doc.data();
-
-          if (data['clockOut'] == null && now.hour >= 17) {
-            await absensiRef.doc(doc.id).update({
-              'clockOut': now.toIso8601String(),
-              'fotoClockOut': imageUrl,
-              'fotoClockOutPublicId': publicId,
-            });
-
-            ScaffoldMessenger.of(
-              context,
-            ).showSnackBar(const SnackBar(content: Text('Berhasil Clock Out')));
-          } else if (now.hour < 17) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Clock Out hanya tersedia setelah jam 5 sore'),
-              ),
-            );
-          } else {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Anda sudah Clock Out hari ini')),
-            );
-          }
-        }
-      } else {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('Gagal upload foto')));
+      if (uploadResult == null || uploadResult['url'] == null) {
+        _showMessage('Gagal upload foto ke Cloudinary');
+        return;
       }
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Pengambilan foto dibatalkan')),
-      );
-    }
 
-    await fetchPresensiHariIni();
+      final imageUrl = uploadResult['url'];
+      final publicId = uploadResult['public_id'];
+      final prefs = await SharedPreferences.getInstance();
+      final uid =
+          FirebaseAuth.instance.currentUser?.uid ?? prefs.getString('uid');
+
+      if (uid == null) {
+        _showMessage('User tidak ditemukan, silakan login ulang');
+        return;
+      }
+
+      final now = DateTime.now();
+      final todayStart = DateTime(now.year, now.month, now.day);
+      final absensiRef = FirebaseFirestore.instance.collection('absensi');
+
+      final existingQuery = await absensiRef
+          .where('uid', isEqualTo: uid)
+          .where('tanggal', isEqualTo: todayStart.toIso8601String())
+          .limit(1)
+          .get();
+
+      if (existingQuery.docs.isEmpty) {
+        // Clock In
+        final jamMasuk = DateTime(
+          now.year,
+          now.month,
+          now.day,
+          8,
+          0,
+        ); // Jam kerja 08:00
+        final terlambat = now.isAfter(jamMasuk);
+        await absensiRef.add({
+          'uid': uid,
+          'nama': username,
+          'tanggal': todayStart.toIso8601String(),
+          'clockIn': now.toIso8601String(),
+          'fotoClockIn': imageUrl,
+          'fotoClockInPublicId': publicId,
+          'terlambat': terlambat,
+        });
+        setState(() {
+          clockInTime = now;
+          terlambatStatus = terlambat;
+        });
+        _showMessage('Berhasil Clock In');
+      } else {
+        final doc = existingQuery.docs.first;
+        final data = doc.data();
+
+        final hasClockedOut = data['clockOut'] != null;
+        final isAfter17 = now.hour >= 17;
+
+        if (!hasClockedOut && isAfter17) {
+          await absensiRef.doc(doc.id).update({
+            'clockOut': now.toIso8601String(),
+            'fotoClockOut': imageUrl,
+            'fotoClockOutPublicId': publicId,
+          });
+          _showMessage('Berhasil Clock Out');
+        } else if (!isAfter17) {
+          _showMessage('Clock Out hanya tersedia setelah jam 5 sore');
+        } else {
+          _showMessage('Anda sudah Clock Out hari ini');
+        }
+      }
+
+      await fetchPresensiHariIni();
+    } catch (e) {
+      debugPrint('Error saat proses foto dan upload: $e');
+      _showMessage('Terjadi kesalahan saat presensi: $e');
+    }
+  }
+
+  // Fungsi utilitas untuk menampilkan pesan
+  void _showMessage(String message) {
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 
   @override
@@ -249,6 +275,19 @@ class _HomePageState extends State<HomePage> {
                       "Masuk : ${clockInTime != null ? DateFormat.Hm().format(clockInTime!) : "-"}",
                       style: const TextStyle(color: Colors.blue),
                     ),
+                    const SizedBox(height: 4),
+                    if (clockInTime != null)
+                      Text(
+                        terlambatStatus == true
+                            ? 'Status: Terlambat'
+                            : 'Status: Tepat Waktu',
+                        style: TextStyle(
+                          color: terlambatStatus == true
+                              ? Colors.red
+                              : Colors.green,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
                   ],
                 ),
               ),
@@ -329,36 +368,36 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-Widget _buildMenuUtamaTitle() {
-  return Padding(
-    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-    child: Text(
-      "Menu Utama",
-      style: const TextStyle(
-        fontSize: 20, // Ukuran font lebih besar
-        fontWeight: FontWeight.bold,
-        color: Colors.black, // Warna teks
+  Widget _buildMenuUtamaTitle() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+      child: Text(
+        "Menu Utama",
+        style: const TextStyle(
+          fontSize: 20, // Ukuran font lebih besar
+          fontWeight: FontWeight.bold,
+          color: Colors.black, // Warna teks
+        ),
       ),
-    ),
-  );
-}
+    );
+  }
 
-Widget _buildMenuIcons() {
-  return Padding(
-    padding: const EdgeInsets.symmetric(horizontal: 24),
-    child: GridView.count(
-      crossAxisCount: 2, // Mengatur jumlah kolom
-      shrinkWrap: true, // Menghindari overflow
-      physics: const NeverScrollableScrollPhysics(), // Menonaktifkan scroll
-      childAspectRatio: 1.2, // Rasio aspek untuk ikon
-      children: const [
-        MenuIcon(icon: Icons.assignment_outlined, label: "Riwayat Presensi"),
-        MenuIcon(icon: Icons.location_on_outlined, label: "Lokasi"),
-        MenuIcon(icon: Icons.mail_outline, label: "Pengajuan Izin"),
-        MenuIcon(icon: Icons.event_note_outlined, label: "Aktivitas"),
-        MenuIcon(icon: Icons.attach_money_outlined, label: "Informasi Gaji"),
-      ],
-    ),
-  );
-}
+  Widget _buildMenuIcons() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 24),
+      child: GridView.count(
+        crossAxisCount: 2, // Mengatur jumlah kolom
+        shrinkWrap: true, // Menghindari overflow
+        physics: const NeverScrollableScrollPhysics(), // Menonaktifkan scroll
+        childAspectRatio: 1.2, // Rasio aspek untuk ikon
+        children: const [
+          MenuIcon(icon: Icons.assignment_outlined, label: "Riwayat Presensi"),
+          MenuIcon(icon: Icons.location_on_outlined, label: "Lokasi"),
+          MenuIcon(icon: Icons.mail_outline, label: "Pengajuan Izin"),
+          MenuIcon(icon: Icons.event_note_outlined, label: "Aktivitas"),
+          MenuIcon(icon: Icons.attach_money_outlined, label: "Informasi Gaji"),
+        ],
+      ),
+    );
+  }
 }
