@@ -14,6 +14,9 @@ use Filament\Tables\Actions\DeleteAction;
 use CloudinaryLabs\CloudinaryLaravel\Facades\Cloudinary;
 use Filament\Tables;
 use Illuminate\Support\Facades\Log;
+use App\Exports\PresenceExport;
+use Maatwebsite\Excel\Facades\Excel;
+use Filament\Forms\Components\DatePicker;
 
 class ListPresences extends ListRecords
 {
@@ -53,58 +56,75 @@ class ListPresences extends ListRecords
                                 'clock_out' => isset($absen['clockOut']) ? Carbon::parse($absen['clockOut']) : null,
                                 'foto_clock_in' => $absen['fotoClockIn'] ?? null,
                                 'foto_clock_out' => $absen['fotoClockOut'] ?? null,
-                                'status' => $absen['terlambat'] ?? true, // Default to true if not set
+                                'status' => $absen['terlambat'] ?? true,
                             ]
                         );
                     }
                     Notification::make()
-                    ->title('Data presensi berhasil disinkronkan!')
-                    ->success()
-                    ->send();
+                        ->title('Data presensi berhasil disinkronkan!')
+                        ->success()
+                        ->send();
+                }),
+            Action::make('export_excel')
+                ->label('Download Excel')
+                ->icon('heroicon-o-arrow-down-tray')
+                ->color('success')
+                ->form([
+                    DatePicker::make('tanggal_dari')
+                        ->label('Dari Tanggal')
+                        ->default(now()->subDays(1)->toDateString()) // Default: kemarin
+                        ->displayFormat('Y-m-d'),
+                    DatePicker::make('tanggal_sampai')
+                        ->label('Sampai Tanggal')
+                        ->default(now()->toDateString()) // Default: hari ini
+                        ->displayFormat('Y-m-d'),
+                ])
+                ->action(function (array $data) {
+                    $tanggal_dari = $data['tanggal_dari'] ?? null;
+                    $tanggal_sampai = $data['tanggal_sampai'] ?? null;
+                    return Excel::download(
+                        new PresenceExport($tanggal_dari, $tanggal_sampai),
+                        'Presensi_Karyawan_' . now()->format('m_His') . '.xlsx'
+                    );
                 }),
         ];
-        
     }
 
     protected function getTableActions(): array
     {
         return [
             DeleteAction::make()
-            ->before(function (Presence $record) {
-                // Konfigurasi ulang Cloudinary secara eksplisit
-                Cloudinary::config([
-                    'cloud_name' => config('cloudinary.cloud.cloud_name'),
-                    'api_key'    => config('cloudinary.cloud.api_key'),
-                    'api_secret' => config('cloudinary.cloud.api_secret'),
-                ]);
+                ->before(function (Presence $record) {
+                    Cloudinary::config([
+                        'cloud_name' => config('cloudinary.cloud.cloud_name'),
+                        'api_key' => config('cloudinary.cloud.api_key'),
+                        'api_secret' => config('cloudinary.cloud.api_secret'),
+                    ]);
 
-                // Hapus foto Clock In
-                try {
-                    if ($record->public_id_clock_in) {
-                        Cloudinary::destroy($record->public_id_clock_in);
-                        Log::info('Berhasil hapus foto Clock In dari Cloudinary: ' . $record->public_id_clock_in);
+                    try {
+                        if ($record->public_id_clock_in) {
+                            Cloudinary::destroy($record->public_id_clock_in);
+                            Log::info('Berhasil hapus foto Clock In dari Cloudinary: ' . $record->public_id_clock_in);
+                        }
+                    } catch (\Exception $e) {
+                        Log::error("Gagal menghapus foto clock_in dari Cloudinary: {$record->public_id_clock_in}, Error: {$e->getMessage()}");
                     }
-                } catch (\Exception $e) {
-                    Log::error("Gagal menghapus foto clock_in dari Cloudinary: {$record->public_id_clock_in}, Error: {$e->getMessage()}");
-                }
 
-                // Hapus foto Clock Out
-                try {
-                    if ($record->public_id_clock_out) {
-                        Cloudinary::destroy($record->public_id_clock_out);
-                        Log::info('Berhasil hapus foto Clock Out dari Cloudinary: ' . $record->public_id_clock_out);
+                    try {
+                        if ($record->public_id_clock_out) {
+                            Cloudinary::destroy($record->public_id_clock_out);
+                            Log::info('Berhasil hapus foto Clock Out dari Cloudinary: ' . $record->public_id_clock_out);
+                        }
+                    } catch (\Exception $e) {
+                        Log::error("Gagal menghapus foto clock_out dari Cloudinary: {$record->public_id_clock_out}, Error: {$e->getMessage()}");
                     }
-                } catch (\Exception $e) {
-                    Log::error("Gagal menghapus foto clock_out dari Cloudinary: {$record->public_id_clock_out}, Error: {$e->getMessage()}");
-                }
-            })
-            ->after(function () {
-                Notification::make()
-                    ->title('Presensi & Foto berhasil dihapus dari Cloudinary.')
-                    ->success()
-                    ->send();
-            }),
+                })
+                ->after(function () {
+                    Notification::make()
+                        ->title('Presensi & Foto berhasil dihapus dari Cloudinary.')
+                        ->success()
+                        ->send();
+                }),
         ];
     }
-
 }

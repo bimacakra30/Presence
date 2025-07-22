@@ -11,6 +11,9 @@ use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
 use CloudinaryLabs\CloudinaryLaravel\Facades\Cloudinary;
+use Filament\Forms\Components\DatePicker;
+use Filament\Tables\Filters\Filter;
+
 
 class PresenceResource extends Resource
 {
@@ -114,7 +117,28 @@ class PresenceResource extends Resource
                     ->toggleable(isToggledHiddenByDefault: true),
             ])
             ->filters([
-                //
+                Filter::make('tanggal_range')
+                    ->form([
+                        DatePicker::make('tanggal_dari')
+                            ->label('Dari Tanggal'),
+                        DatePicker::make('tanggal_sampai')
+                            ->label('Sampai Tanggal'),
+                    ])
+                    ->query(function ($query, array $data) {
+                        return $query
+                            ->when($data['tanggal_dari'], fn ($query) => $query->whereDate('tanggal', '>=', $data['tanggal_dari']))
+                            ->when($data['tanggal_sampai'], fn ($query) => $query->whereDate('tanggal', '<=', $data['tanggal_sampai']));
+                    })
+                    ->indicateUsing(function (array $data): ?string {
+                        $indicator = '';
+                        if ($data['tanggal_dari']) {
+                            $indicator .= 'Dari: ' . $data['tanggal_dari'];
+                        }
+                        if ($data['tanggal_sampai']) {
+                            $indicator .= ($indicator ? ' - ' : '') . 'Sampai: ' . $data['tanggal_sampai'];
+                        }
+                        return $indicator ?: null;
+                    }),
             ])
             ->actions([
                 Tables\Actions\DeleteAction::make()
