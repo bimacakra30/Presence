@@ -11,7 +11,9 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::table('employees', function (Blueprint $table) {
+        Schema::table('presences', function (Blueprint $table) {
+            $table->boolean('status')->default(true)->after('public_id_clock_out');
+            // You can add other columns or modifications here if needed
         });
     }
 
@@ -20,7 +22,7 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::table('employees', function (Blueprint $table) {
+        Schema::table('presences', function (Blueprint $table) {
             //
         });
     }

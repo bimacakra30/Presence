@@ -10,8 +10,7 @@ use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
-use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\SoftDeletingScope;
+use CloudinaryLabs\CloudinaryLaravel\Facades\Cloudinary;
 
 class PresenceResource extends Resource
 {
@@ -19,7 +18,6 @@ class PresenceResource extends Resource
     protected static ?string $navigationGroup = 'Presensi';
     protected static ?string $navigationBadgeTooltip = 'Jumlah Presensi Karyawan';
     protected static ?string $navigationLabel = 'Presensi Karyawan';
-
     protected static ?string $navigationIcon = 'heroicon-o-clipboard-document-check';
 
     public static function form(Form $form): Form
@@ -34,12 +32,47 @@ class PresenceResource extends Resource
                     ->maxLength(255),
                 Forms\Components\DatePicker::make('tanggal')
                     ->required(),
-                Forms\Components\TextInput::make('clock_in'),
-                Forms\Components\TextInput::make('clock_out'),
-                Forms\Components\TextInput::make('foto_clock_in')
-                    ->maxLength(255),
-                Forms\Components\TextInput::make('foto_clock_out')
-                    ->maxLength(255),
+                Forms\Components\TimePicker::make('clock_in'),
+                Forms\Components\TimePicker::make('clock_out'),
+                Forms\Components\FileUpload::make('foto_clock_in')
+                    ->image()
+                    ->required()
+                    ->afterStateUpdated(function ($state, callable $set) {
+                        if ($state) {
+                            try {
+                                $uploaded = Cloudinary::upload($state->getRealPath(), [
+                                    'upload_preset' => env('CLOUDINARY_UPLOAD_PRESET'),
+                                ]);
+                                $set('foto_clock_in', $uploaded->getSecurePath());
+                                $set('public_id_clock_in', $uploaded->getPublicId());
+                            } catch (\Exception $e) {
+                                \Filament\Notifications\Notification::make()
+                                    ->title('Upload Failed')
+                                    ->body('Failed to upload clock-in photo: ' . $e->getMessage())
+                                    ->danger()
+                                    ->send();
+                            }
+                        }
+                    }),
+                Forms\Components\FileUpload::make('foto_clock_out')
+                    ->image()
+                    ->afterStateUpdated(function ($state, callable $set) {
+                        if ($state) {
+                            try {
+                                $uploaded = Cloudinary::upload($state->getRealPath(), [
+                                    'upload_preset' => env('CLOUDINARY_UPLOAD_PRESET'),
+                                ]);
+                                $set('foto_clock_out', $uploaded->getSecurePath());
+                                $set('public_id_clock_out', $uploaded->getPublicId());
+                            } catch (\Exception $e) {
+                                \Filament\Notifications\Notification::make()
+                                    ->title('Upload Failed')
+                                    ->body('Failed to upload clock-out photo: ' . $e->getMessage())
+                                    ->danger()
+                                    ->send();
+                            }
+                        }
+                    }),
             ]);
     }
 
@@ -52,9 +85,9 @@ class PresenceResource extends Resource
                 Tables\Columns\TextColumn::make('tanggal')
                     ->date()
                     ->sortable(),
-                    Tables\Columns\TextColumn::make('clock_in')
-                        ->label('Jam Masuk')
-                        ->searchable(),
+                Tables\Columns\TextColumn::make('clock_in')
+                    ->label('Jam Masuk')
+                    ->searchable(),
                 Tables\Columns\ImageColumn::make('foto_clock_in')
                     ->label('Dokumentasi Kehadiran')
                     ->height(200)
@@ -64,6 +97,13 @@ class PresenceResource extends Resource
                 Tables\Columns\ImageColumn::make('foto_clock_out')
                     ->label('Dokumentasi Pulang')
                     ->height(200),
+                Tables\Columns\TextColumn::make('status')
+                    ->label('Status')
+                    ->sortable()
+                    ->toggleable()
+                    ->badge()
+                    ->formatStateUsing(fn (bool $state) => $state ? 'Terlambat' : 'Tidak')
+                    ->color(fn (bool $state) => $state ? 'danger' : 'success'),
                 Tables\Columns\TextColumn::make('created_at')
                     ->dateTime()
                     ->sortable()
@@ -76,13 +116,25 @@ class PresenceResource extends Resource
             ->filters([
                 //
             ])
+            ->actions([
+                Tables\Actions\DeleteAction::make()
+                    ->label('Delete')
+                    ->requiresConfirmation()
+                    ->modalHeading('Confirm Deletion')
+                    ->modalDescription('This will permanently delete the presence record, associated photos in Cloudinary, and related data in Firestore. Are you sure?')
+                    ->action(fn ($record) => $record->delete())
+                    ->successNotificationMessage('Presence and associated photos deleted successfully.'),
+            ])
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
                     Tables\Actions\DeleteBulkAction::make()
-                        ->label('Force Delete')
+                        ->label('Delete')
                         ->requiresConfirmation()
-                        ->action(fn ($records) => $records->each->forceDelete()),
-                ])
+                        ->modalHeading('Confirm Deletion')
+                        ->modalDescription('This will permanently delete selected presence records, associated photos in Cloudinary, and related data in Firestore. Are you sure?')
+                        ->action(fn ($records) => $records->each->delete())
+                        ->successNotificationMessage('Presences and associated photos deleted successfully.'),
+                ]),
             ]);
     }
 
@@ -108,6 +160,6 @@ class PresenceResource extends Resource
 
     public static function getNavigationBadgeColor(): ?string
     {
-        return static::getModel()::count() >3000 ? 'warning' : 'primary';
+        return static::getModel()::count() > 3000 ? 'warning' : 'primary';
     }
 }
