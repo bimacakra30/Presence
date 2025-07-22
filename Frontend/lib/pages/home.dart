@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:fluttertoast/fluttertoast.dart';
 import 'package:intl/intl.dart';
 import '../components/profile_avatar.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -72,105 +73,133 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<void> _ambilFotoDanUpload() async {
-    final picker = ImagePicker();
-    try {
-      final XFile? photo = await picker.pickImage(source: ImageSource.camera);
-
-      if (photo == null) {
-        _showMessage('Pengambilan foto dibatalkan');
-        return;
-      }
-
-      final file = File(photo.path);
-      _showMessage('Mengupload foto ke Cloudinary...');
-
-      final uploadResult = await CloudinaryService.uploadImageToCloudinary(
-        file,
-      );
-
-      if (uploadResult == null || uploadResult['url'] == null) {
-        _showMessage('Gagal upload foto ke Cloudinary');
-        return;
-      }
-
-      final imageUrl = uploadResult['url'];
-      final publicId = uploadResult['public_id'];
-      final prefs = await SharedPreferences.getInstance();
-      final uid =
-          FirebaseAuth.instance.currentUser?.uid ?? prefs.getString('uid');
-
-      if (uid == null) {
-        _showMessage('User tidak ditemukan, silakan login ulang');
-        return;
-      }
-
-      final now = DateTime.now();
-      final todayStart = DateTime(now.year, now.month, now.day);
-      final absensiRef = FirebaseFirestore.instance.collection('absensi');
-
-      final existingQuery = await absensiRef
-          .where('uid', isEqualTo: uid)
-          .where('tanggal', isEqualTo: todayStart.toIso8601String())
-          .limit(1)
-          .get();
-
-      if (existingQuery.docs.isEmpty) {
-        // Clock In
-        final jamMasuk = DateTime(
-          now.year,
-          now.month,
-          now.day,
-          8,
-          0,
-        ); // Jam kerja 08:00
-        final terlambat = now.isAfter(jamMasuk);
-        await absensiRef.add({
-          'uid': uid,
-          'nama': username,
-          'tanggal': todayStart.toIso8601String(),
-          'clockIn': now.toIso8601String(),
-          'fotoClockIn': imageUrl,
-          'fotoClockInPublicId': publicId,
-          'terlambat': terlambat,
-        });
-        setState(() {
-          clockInTime = now;
-          terlambatStatus = terlambat;
-        });
-        _showMessage('Berhasil Clock In');
-      } else {
-        final doc = existingQuery.docs.first;
-        final data = doc.data();
-
-        final hasClockedOut = data['clockOut'] != null;
-        final isAfter17 = now.hour >= 17;
-
-        if (!hasClockedOut && isAfter17) {
-          await absensiRef.doc(doc.id).update({
-            'clockOut': now.toIso8601String(),
-            'fotoClockOut': imageUrl,
-            'fotoClockOutPublicId': publicId,
-          });
-          _showMessage('Berhasil Clock Out');
-        } else if (!isAfter17) {
-          _showMessage('Clock Out hanya tersedia setelah jam 5 sore');
-        } else {
-          _showMessage('Anda sudah Clock Out hari ini');
-        }
-      }
-
-      await fetchPresensiHariIni();
-    } catch (e) {
-      debugPrint('Error saat proses foto dan upload: $e');
-      _showMessage('Terjadi kesalahan saat presensi: $e');
+  final picker = ImagePicker();
+  try {
+    // Ambil foto dari kamera
+    final XFile? photo = await picker.pickImage(source: ImageSource.camera);
+    if (photo == null) {
+      _showMessage('Pengambilan foto dibatalkan');
+      return;
     }
-  }
 
-  // Fungsi utilitas untuk menampilkan pesan
+    // Upload foto ke Cloudinary
+    _showMessage('Mengupload foto ke Cloudinary...');
+    final file = File(photo.path);
+    final uploadResult = await CloudinaryService.uploadImageToCloudinary(file);
+    if (uploadResult == null || uploadResult['url'] == null) {
+      _showMessage('Gagal upload foto ke Cloudinary');
+      return;
+    }
+
+    // Ambil data pengguna
+    final prefs = await SharedPreferences.getInstance();
+    final uid = FirebaseAuth.instance.currentUser?.uid ?? prefs.getString('uid');
+    if (uid == null) {
+      _showMessage('User tidak ditemukan, silakan login ulang');
+      return;
+    }
+
+    // Proses absensi
+    final now = DateTime.now();
+    final existingQuery = await FirebaseFirestore.instance
+        .collection('absensi')
+        .where('uid', isEqualTo: uid)
+        .where('tanggal', isEqualTo: DateTime(now.year, now.month, now.day).toIso8601String())
+        .limit(1)
+        .get();
+
+    await _handleAttendance(
+      uid: uid,
+      username: username,
+      imageUrl: uploadResult['url'],
+      publicId: uploadResult['public_id'],
+      now: now,
+      existingQuery: existingQuery,
+    );
+
+    await fetchPresensiHariIni();
+  } catch (e) {
+    debugPrint('Error saat proses foto dan upload: $e');
+    _showMessage('Terjadi kesalahan saat presensi: $e');
+  }
+}
+
+Future<void> _handleAttendance({
+  required String uid,
+  required String username,
+  required String imageUrl,
+  required String publicId,
+  required DateTime now,
+  required QuerySnapshot existingQuery,
+}) async {
+  try {
+    final todayStart = DateTime(now.year, now.month, now.day);
+    const workStartHour = 8;
+    const workEndHour = 17;
+    final absensiRef = FirebaseFirestore.instance.collection('absensi');
+
+    if (existingQuery.docs.isEmpty) {
+      // Handle Clock In
+      final workStartTime = DateTime(now.year, now.month, now.day, workStartHour);
+      final isLate = now.isAfter(workStartTime);
+
+      await absensiRef.add({
+        'uid': uid,
+        'nama': username,
+        'tanggal': todayStart.toIso8601String(),
+        'clockIn': now.toIso8601String(),
+        'fotoClockIn': imageUrl,
+        'fotoClockInPublicId': publicId,
+        'terlambat': isLate,
+      });
+
+      setState(() {
+        clockInTime = now;
+        terlambatStatus = isLate;
+      });
+
+      _showMessage('Berhasil Clock In');
+    } else {
+      // Handle Clock Out
+      final doc = existingQuery.docs.first;
+      final data = doc.data() as Map<String, dynamic>;
+      final hasClockedOut = data['clockOut'] != null;
+      final canClockOut = now.hour >= workEndHour;
+
+      if (hasClockedOut) {
+        _showMessage('Anda sudah Clock Out hari ini');
+        return;
+      }
+
+      if (!canClockOut) {
+        _showMessage('Clock Out hanya tersedia setelah jam 17:00');
+        return;
+      }
+
+      await absensiRef.doc(doc.id).update({
+        'clockOut': now.toIso8601String(),
+        'fotoClockOut': imageUrl,
+        'fotoClockOutPublicId': publicId,
+      });
+
+      _showMessage('Berhasil Clock Out');
+    }
+  } catch (e) {
+    _showMessage('Terjadi kesalahan saat presensi: $e');
+    rethrow; // Rethrow untuk debugging jika diperlukan
+  }
+}
+
   void _showMessage(String message) {
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text(message)));
+    Fluttertoast.showToast(
+      msg: message,
+      toastLength: Toast.LENGTH_LONG,
+      gravity: ToastGravity.BOTTOM,
+      timeInSecForIosWeb: 3,
+      backgroundColor: Colors.black87,
+      textColor: Colors.white,
+      fontSize: 16.0,
+    );
   }
 
   @override
