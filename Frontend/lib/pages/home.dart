@@ -23,7 +23,7 @@ class _HomePageState extends State<HomePage> {
   String username = "Pengguna";
   DateTime? clockInTime;
   DateTime? clockOutTime;
-  bool? terlambatStatus;
+  bool? lateStatus;
 
   @override
   void initState() {
@@ -56,139 +56,157 @@ class _HomePageState extends State<HomePage> {
             clockOutTime = DateTime.parse(data['clockOut']);
           }
 
-          if (data['terlambat'] != null) {
-            terlambatStatus = data['terlambat'];
+          if (data['late'] != null) {
+            lateStatus = data['late'];
           }
         });
       }
     } catch (e) {
       debugPrint('Error fetching presensi: $e');
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Gagal memuat data presensi: $e'),
-        ),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Gagal memuat data presensi: $e')));
     }
   }
 
   Future<void> _ambilFotoDanUpload() async {
-  final picker = ImagePicker();
-  try {
-    // Ambil foto dari kamera
-    final XFile? photo = await picker.pickImage(source: ImageSource.camera);
-    if (photo == null) {
-      _showMessage('Pengambilan foto dibatalkan');
-      return;
-    }
-
-    // Upload foto ke Cloudinary
-    _showMessage('Mengupload foto ke Cloudinary...');
-    final file = File(photo.path);
-    final uploadResult = await CloudinaryService.uploadImageToCloudinary(file);
-    if (uploadResult == null || uploadResult['url'] == null) {
-      _showMessage('Gagal upload foto ke Cloudinary');
-      return;
-    }
-
-    // Ambil data pengguna
-    final prefs = await SharedPreferences.getInstance();
-    final uid = FirebaseAuth.instance.currentUser?.uid ?? prefs.getString('uid');
-    if (uid == null) {
-      _showMessage('User tidak ditemukan, silakan login ulang');
-      return;
-    }
-
-    // Proses absensi
-    final now = DateTime.now();
-    final existingQuery = await FirebaseFirestore.instance
-        .collection('absensi')
-        .where('uid', isEqualTo: uid)
-        .where('tanggal', isEqualTo: DateTime(now.year, now.month, now.day).toIso8601String())
-        .limit(1)
-        .get();
-
-    await _handleAttendance(
-      uid: uid,
-      username: username,
-      imageUrl: uploadResult['url'],
-      publicId: uploadResult['public_id'],
-      now: now,
-      existingQuery: existingQuery,
-    );
-
-    await fetchPresensiHariIni();
-  } catch (e) {
-    debugPrint('Error saat proses foto dan upload: $e');
-    _showMessage('Terjadi kesalahan saat presensi: $e');
-  }
-}
-
-Future<void> _handleAttendance({
-  required String uid,
-  required String username,
-  required String imageUrl,
-  required String publicId,
-  required DateTime now,
-  required QuerySnapshot existingQuery,
-}) async {
-  try {
-    final todayStart = DateTime(now.year, now.month, now.day);
-    const workStartHour = 8;
-    const workEndHour = 17;
-    final absensiRef = FirebaseFirestore.instance.collection('absensi');
-
-    if (existingQuery.docs.isEmpty) {
-      // Handle Clock In
-      final workStartTime = DateTime(now.year, now.month, now.day, workStartHour);
-      final isLate = now.isAfter(workStartTime);
-
-      await absensiRef.add({
-        'uid': uid,
-        'nama': username,
-        'tanggal': todayStart.toIso8601String(),
-        'clockIn': now.toIso8601String(),
-        'fotoClockIn': imageUrl,
-        'fotoClockInPublicId': publicId,
-        'terlambat': isLate,
-      });
-
-      setState(() {
-        clockInTime = now;
-        terlambatStatus = isLate;
-      });
-
-      _showMessage('Berhasil Clock In');
-    } else {
-      // Handle Clock Out
-      final doc = existingQuery.docs.first;
-      final data = doc.data() as Map<String, dynamic>;
-      final hasClockedOut = data['clockOut'] != null;
-      final canClockOut = now.hour >= workEndHour;
-
-      if (hasClockedOut) {
-        _showMessage('Anda sudah Clock Out hari ini');
+    final picker = ImagePicker();
+    try {
+      // Ambil foto dari kamera
+      final XFile? photo = await picker.pickImage(source: ImageSource.camera);
+      if (photo == null) {
+        _showMessage('Pengambilan foto dibatalkan');
         return;
       }
 
-      if (!canClockOut) {
-        _showMessage('Clock Out hanya tersedia setelah jam 17:00');
+      // Upload foto ke Cloudinary
+      _showMessage('Mengupload foto ke Cloudinary...');
+      final file = File(photo.path);
+      final uploadResult = await CloudinaryService.uploadImageToCloudinary(
+        file,
+      );
+      if (uploadResult == null || uploadResult['url'] == null) {
+        _showMessage('Gagal upload foto ke Cloudinary');
         return;
       }
 
-      await absensiRef.doc(doc.id).update({
-        'clockOut': now.toIso8601String(),
-        'fotoClockOut': imageUrl,
-        'fotoClockOutPublicId': publicId,
-      });
+      // Ambil data pengguna
+      final prefs = await SharedPreferences.getInstance();
+      final uid =
+          FirebaseAuth.instance.currentUser?.uid ?? prefs.getString('uid');
+      if (uid == null) {
+        _showMessage('User tidak ditemukan, silakan login ulang');
+        return;
+      }
 
-      _showMessage('Berhasil Clock Out');
+      // Proses presence
+      final now = DateTime.now();
+      final existingQuery = await FirebaseFirestore.instance
+          .collection('presence')
+          .where('uid', isEqualTo: uid)
+          .where(
+            'date',
+            isEqualTo: DateTime(now.year, now.month, now.day).toIso8601String(),
+          )
+          .limit(1)
+          .get();
+
+      await _handleAttendance(
+        uid: uid,
+        username: username,
+        imageUrl: uploadResult['url'],
+        publicId: uploadResult['public_id'],
+        now: now,
+        existingQuery: existingQuery,
+      );
+
+      await fetchPresensiHariIni();
+    } catch (e) {
+      debugPrint('Error saat proses foto dan upload: $e');
+      _showMessage('Terjadi kesalahan saat presensi: $e');
     }
-  } catch (e) {
-    _showMessage('Terjadi kesalahan saat presensi: $e');
-    rethrow; // Rethrow untuk debugging jika diperlukan
   }
-}
+
+  Future<void> _handleAttendance({
+    required String uid,
+    required String username,
+    required String imageUrl,
+    required String publicId,
+    required DateTime now,
+    required QuerySnapshot existingQuery,
+  }) async {
+    try {
+      final todayStart = DateTime(now.year, now.month, now.day);
+      const workStartHour = 8;
+      const workEndHour = 17;
+      final presenceRef = FirebaseFirestore.instance.collection('presence');
+
+      if (existingQuery.docs.isEmpty) {
+        final workStartTime = DateTime(
+          now.year,
+          now.month,
+          now.day,
+          workStartHour,
+        );
+        final isLate = now.isAfter(workStartTime);
+
+        String? lateDuration;
+
+        if (isLate) {
+          final duration = now.difference(workStartTime);
+          final hours = duration.inHours;
+          final minutes = duration.inMinutes % 60;
+          lateDuration = '${hours > 0 ? '$hours jam ' : ''}$minutes menit';
+        }
+
+        await presenceRef.add({
+          'uid': uid,
+          'name': username,
+          'date': todayStart.toIso8601String(),
+          'clockIn': now.toIso8601String(),
+          'fotoClockIn': imageUrl,
+          'fotoClockInPublicId': publicId,
+          'late': isLate,
+          if (lateDuration != null) 'lateDuration': lateDuration,
+        });
+
+        setState(() {
+          clockInTime = now;
+          lateStatus = isLate;
+        });
+
+        _showMessage('Berhasil Clock In');
+      } else {
+        // Handle Clock Out
+        final doc = existingQuery.docs.first;
+        final data = doc.data() as Map<String, dynamic>;
+        final hasClockedOut = data['clockOut'] != null;
+        final canClockOut = now.hour >= workEndHour;
+
+        if (hasClockedOut) {
+          _showMessage('Anda sudah Clock Out hari ini');
+          return;
+        }
+
+        if (!canClockOut) {
+          _showMessage('Clock Out hanya tersedia setelah jam 17:00');
+          return;
+        }
+
+        await presenceRef.doc(doc.id).update({
+          'clockOut': now.toIso8601String(),
+          'fotoClockOut': imageUrl,
+          'fotoClockOutPublicId': publicId,
+        });
+
+        _showMessage('Berhasil Clock Out');
+      }
+    } catch (e) {
+      _showMessage('Terjadi kesalahan saat presensi: $e');
+      rethrow; // Rethrow untuk debugging jika diperlukan
+    }
+  }
 
   void _showMessage(String message) {
     Fluttertoast.showToast(
@@ -286,81 +304,73 @@ Future<void> _handleAttendance({
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Kolom Kiri - Informasi Presensi
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        "Tanggal",
-                        style: TextStyle(fontSize: 13, color: Colors.black54),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        DateFormat('EEEE, dd MMMM yyyy', 'id_ID').format(DateTime.now()),
-                        style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 15,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        "Masuk : ${clockInTime != null ? DateFormat.Hm().format(clockInTime!) : "-"}",
-                        style: const TextStyle(
-                          fontSize: 14,
-                          color: Colors.blue,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      if (clockInTime != null)
-                        Text(
-                          terlambatStatus == true
-                              ? 'Status: Terlambat'
-                              : 'Status: Tepat Waktu',
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.bold,
-                            color: terlambatStatus == true ? Colors.red : Colors.green,
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
-
-                // Spacer antara dua kolom
-                const SizedBox(width: 16),
-
-                // Kolom Kanan - Jadwal dan Pulang
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Kolom Kiri - Informasi Presensi
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const Text(
-                      "Jadwal",
+                      "Tanggal",
                       style: TextStyle(fontSize: 13, color: Colors.black54),
                     ),
                     const SizedBox(height: 4),
-                    const Text(
-                      "08.00 - 17.00 WIB",
-                      style: TextStyle(
+                    Text(
+                      DateFormat(
+                        'EEEE, dd MMMM yyyy',
+                        'id_ID',
+                      ).format(DateTime.now()),
+                      style: const TextStyle(
                         fontWeight: FontWeight.bold,
                         fontSize: 15,
                       ),
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      "Pulang : ${clockOutTime != null ? DateFormat.Hm().format(clockOutTime!) : "-"}",
-                      style: const TextStyle(
-                        fontSize: 14,
-                        color: Colors.blue,
-                      ),
+                      "Masuk : ${clockInTime != null ? DateFormat.Hm().format(clockInTime!) : "-"}",
+                      style: const TextStyle(fontSize: 14, color: Colors.blue),
                     ),
+                    const SizedBox(height: 4),
+                    if (clockInTime != null && lateStatus != null)
+                      Text(
+                        'Status: ${lateStatus! ? 'Terlambat' : 'Tepat Waktu'}',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                          color: lateStatus! ? Colors.red : Colors.green,
+                        ),
+                      ),
                   ],
                 ),
-              ],
-            ),
+              ),
+
+              // Spacer antara dua kolom
+              const SizedBox(width: 16),
+
+              // Kolom Kanan - Jadwal dan Pulang
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  const Text(
+                    "Jadwal",
+                    style: TextStyle(fontSize: 13, color: Colors.black54),
+                  ),
+                  const SizedBox(height: 4),
+                  const Text(
+                    "08.00 - 17.00 WIB",
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    "Pulang : ${clockOutTime != null ? DateFormat.Hm().format(clockOutTime!) : "-"}",
+                    style: const TextStyle(fontSize: 14, color: Colors.blue),
+                  ),
+                ],
+              ),
+            ],
+          ),
           const Divider(height: 32),
           const Text(
             "Rekab Presensi Bulan Ini",

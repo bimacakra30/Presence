@@ -15,9 +15,9 @@ Future<Map<String, dynamic>?> fetchPresensiHariIni() async {
   final todayStart = DateTime(now.year, now.month, now.day);
 
   final query = await FirebaseFirestore.instance
-      .collection('absensi')
+      .collection('presence')
       .where('uid', isEqualTo: uid)
-      .where('tanggal', isEqualTo: todayStart.toIso8601String())
+      .where('date', isEqualTo: todayStart.toIso8601String())
       .limit(1)
       .get();
 
@@ -35,9 +35,9 @@ Future<Map<String, dynamic>?> fetchPresensiHariIniUtil() async {
   final todayStart = DateTime(now.year, now.month, now.day);
 
   final query = await FirebaseFirestore.instance
-      .collection('absensi')
+      .collection('presence')
       .where('uid', isEqualTo: uid)
-      .where('tanggal', isEqualTo: todayStart.toIso8601String())
+      .where('date', isEqualTo: todayStart.toIso8601String())
       .limit(1)
       .get();
 
