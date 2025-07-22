@@ -51,7 +51,7 @@ class Employee extends Model
             }
         });
         static::created(function ($employee) {
-            $service = new \App\Services\FirestoreService();
+            $firestoreService = new \App\Services\FirestoreService();
 
             $data = [
                 'uid' => $employee->uid,
@@ -64,14 +64,29 @@ class Employee extends Model
                 'createdAt' => now()->toISOString(),
             ];
 
-            $collection = $service->getCollection();
+            // Simpan ke Firestore
+            $collection = $firestoreService->getCollection();
             $docRef = $collection->add($data);
-
-            $firestoreId = $docRef->id();
-
-            $employee->firestore_id = $firestoreId;
+            $employee->firestore_id = $docRef->id();
             $employee->saveQuietly();
+
+            // Simpan ke Firebase Auth
+            try {
+                $auth = app('firebase.auth');
+
+                $auth->createUser([
+                    'uid' => $employee->uid,
+                    'email' => $employee->email,
+                    'password' => $employee->password, // Sudah di-hash, akan error jika tidak plain
+                    'displayName' => $employee->name,
+                ]);
+            } catch (\Kreait\Firebase\Exception\Auth\EmailExists $e) {
+                Log::warning('Email already exists in Firebase Auth: ' . $employee->email);
+            } catch (\Throwable $e) {
+                Log::error('Failed to create Firebase Auth user: ' . $e->getMessage());
+            }
         });
+
 
         // Update
         static::updated(function ($employee) {

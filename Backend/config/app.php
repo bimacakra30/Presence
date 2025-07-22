@@ -43,6 +43,7 @@ return [
     // ...
         'Cloudinary' => CloudinaryLabs\CloudinaryLaravel\Facades\Cloudinary::class,
     ],
+    
 
     'debug' => (bool) env('APP_DEBUG', false),
 

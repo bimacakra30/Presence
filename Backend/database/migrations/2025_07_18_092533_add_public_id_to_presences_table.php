@@ -11,7 +11,13 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::table('employees', function (Blueprint $table) {
+        Schema::table('presences', function (Blueprint $table) {
+            $table->string('public_id_clock_in')
+                ->nullable()
+                ->after('foto_clock_in');
+            $table->string('public_id_clock_out')
+                ->nullable()
+                ->after('foto_clock_out');
         });
     }
 
@@ -20,7 +26,7 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::table('employees', function (Blueprint $table) {
+        Schema::table('presences', function (Blueprint $table) {
             //
         });
     }
