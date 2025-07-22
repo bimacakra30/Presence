@@ -27,6 +27,7 @@ class UserResource extends Resource
             ->schema([
                  FileUpload::make('photo')
                     ->label('Foto Profile')
+                    ->avatar()
                     ->directory('profile-images')
                     ->image()
                     ->imagePreviewHeight('100')
@@ -54,7 +55,7 @@ class UserResource extends Resource
                     ->label('Foto Profile')
                     ->getStateUsing(fn($record) => asset('storage/' . $record->photo))
                     ->circular()
-                    ->size(50),
+                    ->size(80),
                 Tables\Columns\TextColumn::make('name')
                     ->searchable(),
                 Tables\Columns\TextColumn::make('email')

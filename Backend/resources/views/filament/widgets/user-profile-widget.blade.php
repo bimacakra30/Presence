@@ -30,18 +30,6 @@
                     </div>
                 </div>
             </div>
-            
-            <!-- Right Section: Edit Button -->
-            <div class="flex-shrink-0">
-                <x-filament::button 
-                    color="gray" 
-                    size="xs" 
-                    icon="heroicon-o-pencil"
-                    outlined
-                >
-                    Edit
-                </x-filament::button>
-            </div>
         </div>
     </x-filament::card>
 </x-filament::widget>
