@@ -50,9 +50,11 @@ class _HomePageState extends State<HomePage> {
           if (data['clockIn'] != null) {
             clockInTime = DateTime.parse(data['clockIn']);
           }
+
           if (data['clockOut'] != null) {
             clockOutTime = DateTime.parse(data['clockOut']);
           }
+
           if (data['terlambat'] != null) {
             terlambatStatus = data['terlambat'];
           }
@@ -60,9 +62,12 @@ class _HomePageState extends State<HomePage> {
       }
     } catch (e) {
       debugPrint('Error fetching presensi: $e');
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Gagal memuat data presensi: $e')));
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Gagal memuat data presensi: $e'),
+        ),
+      );
     }
   }
 
@@ -252,64 +257,81 @@ class _HomePageState extends State<HomePage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Kolom Kiri - Informasi Presensi
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        "Tanggal",
+                        style: TextStyle(fontSize: 13, color: Colors.black54),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        DateFormat('EEEE, dd MMMM yyyy', 'id_ID').format(DateTime.now()),
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 15,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        "Masuk : ${clockInTime != null ? DateFormat.Hm().format(clockInTime!) : "-"}",
+                        style: const TextStyle(
+                          fontSize: 14,
+                          color: Colors.blue,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      if (clockInTime != null)
+                        Text(
+                          terlambatStatus == true
+                              ? 'Status: Terlambat'
+                              : 'Status: Tepat Waktu',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                            color: terlambatStatus == true ? Colors.red : Colors.green,
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+
+                // Spacer antara dua kolom
+                const SizedBox(width: 16),
+
+                // Kolom Kanan - Jadwal dan Pulang
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
-                    const Text("Tanggal", style: TextStyle(fontSize: 13)),
+                    const Text(
+                      "Jadwal",
+                      style: TextStyle(fontSize: 13, color: Colors.black54),
+                    ),
                     const SizedBox(height: 4),
-                    Text(
-                      DateFormat(
-                        'EEEE, dd MMMM yyyy',
-                        'id_ID',
-                      ).format(DateTime.now()),
-                      style: const TextStyle(
+                    const Text(
+                      "08.00 - 17.00 WIB",
+                      style: TextStyle(
                         fontWeight: FontWeight.bold,
                         fontSize: 15,
                       ),
                     ),
-                    const SizedBox(height: 4),
+                    const SizedBox(height: 8),
                     Text(
-                      "Masuk : ${clockInTime != null ? DateFormat.Hm().format(clockInTime!) : "-"}",
-                      style: const TextStyle(color: Colors.blue),
-                    ),
-                    const SizedBox(height: 4),
-                    if (clockInTime != null)
-                      Text(
-                        terlambatStatus == true
-                            ? 'Status: Terlambat'
-                            : 'Status: Tepat Waktu',
-                        style: TextStyle(
-                          color: terlambatStatus == true
-                              ? Colors.red
-                              : Colors.green,
-                          fontWeight: FontWeight.bold,
-                        ),
+                      "Pulang : ${clockOutTime != null ? DateFormat.Hm().format(clockOutTime!) : "-"}",
+                      style: const TextStyle(
+                        fontSize: 14,
+                        color: Colors.blue,
                       ),
+                    ),
                   ],
                 ),
-              ),
-              const SizedBox(width: 12),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  const Text("Jadwal", style: TextStyle(fontSize: 13)),
-                  const SizedBox(height: 4),
-                  const Text(
-                    "08.00 - 17.00 WIB",
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    "Pulang : ${clockOutTime != null ? DateFormat.Hm().format(clockOutTime!) : "-"}",
-                    style: const TextStyle(color: Colors.blue),
-                  ),
-                ],
-              ),
-            ],
-          ),
+              ],
+            ),
           const Divider(height: 32),
           const Text(
             "Rekab Presensi Bulan Ini",
