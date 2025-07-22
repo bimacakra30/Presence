@@ -7,32 +7,43 @@ class SettingsPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final primaryColor = Colors.blue.shade800;
+    final backgroundColor = const Color(0xFFF5F5F5);
+
     return Scaffold(
-      backgroundColor: const Color(0xFFEAEAEA),
+      backgroundColor: backgroundColor,
       appBar: AppBar(
-        backgroundColor: Colors.transparent,
+        backgroundColor: backgroundColor,
         elevation: 0,
-        leading: BackButton(color: Colors.black),
-        title: const Text('Settings',
-            style: TextStyle(
-                color: Colors.black, fontSize: 22, fontWeight: FontWeight.bold)),
+        leading: const BackButton(color: Colors.black),
+        title: const Text(
+          'Settings',
+          style: TextStyle(
+            color: Colors.black,
+            fontSize: 22,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
         centerTitle: false,
       ),
       body: ListView(
-        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
         children: [
+          const SizedBox(height: 10),
           _SectionTitle(icon: Icons.person, title: 'Account'),
+          const SizedBox(height: 6),
           _SectionItem(title: 'Edit Profile', onTap: () {}),
           _SectionItem(title: 'Change Password', onTap: () {}),
-          _SectionItem(title: 'Edit Profile', onTap: () {}), // duplikat contoh
 
           const SizedBox(height: 20),
           _SectionTitle(icon: Icons.notifications, title: 'Notifications'),
-          _SectionSwitch(title: 'Notifications'),
-          _SectionSwitch(title: 'App Notifications'),
+          const SizedBox(height: 6),
+          const _SectionSwitch(title: 'Push Notifications'),
+          const _SectionSwitch(title: 'App Notifications'),
 
           const SizedBox(height: 20),
           _SectionTitle(icon: Icons.more_horiz, title: 'More'),
+          const SizedBox(height: 6),
           _SectionItem(title: 'Language', onTap: () {}),
           _SectionItem(title: 'About', onTap: () {}),
 
@@ -40,23 +51,26 @@ class SettingsPage extends StatelessWidget {
           Center(
             child: ElevatedButton.icon(
               style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.white,
-                foregroundColor: Colors.black,
-                elevation: 4,
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                backgroundColor: primaryColor,
+                foregroundColor: Colors.white,
+                elevation: 2,
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
                 shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(30)),
+                  borderRadius: BorderRadius.circular(30),
+                ),
               ),
               icon: const Icon(Icons.logout),
-              label: const Text('Logout'),
+              label: const Text(
+                'Logout',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              ),
               onPressed: () async {
                 await FirebaseAuth.instance.signOut();
                 if (context.mounted) {
                   Navigator.pushAndRemoveUntil(
                     context,
                     MaterialPageRoute(builder: (context) => const LoginPage()),
-                    (route) => false,
+                        (route) => false,
                   );
                 }
               },
@@ -78,11 +92,16 @@ class _SectionTitle extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        Icon(icon, color: Colors.black87),
+        Icon(icon, color: Colors.blue.shade700),
         const SizedBox(width: 8),
-        Text(title,
-            style: const TextStyle(
-                fontSize: 16, fontWeight: FontWeight.bold, color: Colors.black)),
+        Text(
+          title,
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+            color: Colors.blue.shade700,
+          ),
+        ),
       ],
     );
   }
@@ -96,10 +115,21 @@ class _SectionItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ListTile(
-      contentPadding: EdgeInsets.zero,
-      title: Text(title, style: const TextStyle(fontSize: 14)),
+    return InkWell(
       onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      splashColor: Colors.blue,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 12.0),
+        child: Text(
+          title,
+          style: const TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w500,
+            color: Colors.black87,
+          ),
+        ),
+      ),
     );
   }
 }
@@ -119,10 +149,14 @@ class _SectionSwitchState extends State<_SectionSwitch> {
   @override
   Widget build(BuildContext context) {
     return SwitchListTile(
-      title: Text(widget.title, style: const TextStyle(fontSize: 14)),
       contentPadding: EdgeInsets.zero,
       value: _value,
+      title: Text(
+        widget.title,
+        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+      ),
       onChanged: (val) => setState(() => _value = val),
+      activeColor: Colors.blue.shade800,
     );
   }
 }
