@@ -20,52 +20,27 @@ class EmployeePosition extends Model
 
     protected static function booted()
     {
-        // Create
-        static::created(function ($employee) {
-            $service = new \App\Services\FirestoreService();
-
-            $data = [
-                'employee_id' => $employee->employee_id,
-                'position' => $employee->position,
-                'start_date' => $employee->start_date,
-                'end_date' => $employee->end_date,
-            ];
-
-            $collection = $service->getCollectionPosition();
-            $docRef = $collection->add($data);
-
-            $firestoreId = $docRef->id();
-
-            $employee->firestore_id = $firestoreId;
-            $employee->saveQuietly();
+        static::saved(function ($position) {
+            $position->syncEmployeeCurrentPosition();
         });
 
-        // Update
-        static::updated(function ($employee) {
-            if ($employee->firestore_id) {
-                $service = new \App\Services\FirestoreService();
-
-                $data = [
-                    'employee_id' => $employee->employee_id,
-                    'position' => $employee->position,
-                    'start_date' => $employee->start_date->toISOString(),
-                    'end_date' => $employee->end_date ? $employee->end_date->toISOString() : null,
-                ];
-
-                $service->updateUserPosition($employee->firestore_id, $data);
-            }
-        });
-
-        // Delete — only when force delete
-        static::deleted(function ($employee) {
-            Log::info("Deleted event called. Firestore ID: " . $employee->firestore_id);
-
-            if ($employee->firestore_id) {
-                $service = new \App\Services\FirestoreService();
-                $service->deleteUserPosition($employee->firestore_id);
-            }
+        static::deleted(function ($position) {
+            $position->syncEmployeeCurrentPosition();
         });
     }
+
+    public function syncEmployeeCurrentPosition()
+    {
+        $latest = self::where('employee_id', $this->employee_id)
+            ->whereNull('end_date') // Hanya posisi aktif
+            ->latest('start_date')
+            ->first();
+
+        $this->employee->update([
+            'position' => $latest?->position,
+        ]);
+    }
+
 
     public function employee()
     {

@@ -25,6 +25,7 @@ class Presence extends Model
         'public_id_clock_in',
         'public_id_clock_out',
         'status',
+        'durasi_keterlambatan'
     ];
 
     protected static function booted()

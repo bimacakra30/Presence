@@ -22,9 +22,11 @@ class Employee extends Model
         'password',
         'address',
         'date_of_birth',
+        'jabatan',
         'status',
         'provider',
         'firestore_id',
+
     ];
 
     protected $hidden = [

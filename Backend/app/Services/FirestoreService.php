@@ -59,7 +59,7 @@ class FirestoreService
 
     public function getAbsensi()
     {
-        $collection = $this->db->collection('absensi')->documents();
+        $collection = $this->db->collection('presence')->documents();
         $absensi = [];
 
         foreach ($collection as $document) {
@@ -80,7 +80,7 @@ class FirestoreService
 
      public function deleteAbsensi($documentId)
     {
-        $collection = $this->db->collection('absensi');
+        $collection = $this->db->collection('presence');
         $collection->document($documentId)->delete();
     }
 

@@ -46,17 +46,18 @@ class ListPresences extends ListRecords
                             [
                                 'firestore_id' => $absen['firestore_id'] ?? null,
                                 'uid' => $absen['uid'] ?? '',
-                                'tanggal' => Carbon::parse($absen['tanggal'] ?? now())->toDateString(),
+                                'tanggal' => Carbon::parse($absen['date'] ?? now())->toDateString(),
                             ],
                             [
-                                'nama' => $absen['nama'] ?? '',
+                                'nama' => $absen['name'] ?? '',
                                 'clock_in' => isset($absen['clockIn']) ? Carbon::parse($absen['clockIn']) : null,
                                 'public_id_clock_in' => $absen['fotoClockInPublicId'] ?? null,
                                 'public_id_clock_out' => $absen['fotoClockOutPublicId'] ?? null,
                                 'clock_out' => isset($absen['clockOut']) ? Carbon::parse($absen['clockOut']) : null,
                                 'foto_clock_in' => $absen['fotoClockIn'] ?? null,
                                 'foto_clock_out' => $absen['fotoClockOut'] ?? null,
-                                'status' => $absen['terlambat'] ?? true,
+                                'status' => $absen['late'] ?? true,
+                                'durasi_keterlambatan' => $absen['lateDuration'] ?? null,
                             ]
                         );
                     }

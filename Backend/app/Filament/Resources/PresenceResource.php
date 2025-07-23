@@ -18,7 +18,7 @@ use Filament\Tables\Filters\Filter;
 class PresenceResource extends Resource
 {
     protected static ?string $model = Presence::class;
-    protected static ?string $navigationGroup = 'Presensi';
+    protected static ?string $navigationGroup = 'Presensi & Perizinan';
     protected static ?string $navigationBadgeTooltip = 'Jumlah Presensi Karyawan';
     protected static ?string $navigationLabel = 'Presensi Karyawan';
     protected static ?string $navigationIcon = 'heroicon-o-clipboard-document-check';
@@ -107,6 +107,9 @@ class PresenceResource extends Resource
                     ->badge()
                     ->formatStateUsing(fn (bool $state) => $state ? 'Terlambat' : 'Tidak')
                     ->color(fn (bool $state) => $state ? 'danger' : 'success'),
+                Tables\Columns\TextColumn::make('durasi_keterlambatan')
+                    ->label('Durasi Keterlambatan')
+                    ->sortable(),
                 Tables\Columns\TextColumn::make('created_at')
                     ->dateTime()
                     ->sortable()
@@ -141,13 +144,7 @@ class PresenceResource extends Resource
                     }),
             ])
             ->actions([
-                Tables\Actions\DeleteAction::make()
-                    ->label('Delete')
-                    ->requiresConfirmation()
-                    ->modalHeading('Confirm Deletion')
-                    ->modalDescription('This will permanently delete the presence record, associated photos in Cloudinary, and related data in Firestore. Are you sure?')
-                    ->action(fn ($record) => $record->delete())
-                    ->successNotificationMessage('Presence and associated photos deleted successfully.'),
+                //
             ])
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([

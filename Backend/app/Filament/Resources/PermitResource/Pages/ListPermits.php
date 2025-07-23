@@ -10,6 +10,8 @@ class ListPermits extends ListRecords
 {
     protected static string $resource = PermitResource::class;
 
+    protected static ?string $title = 'Perizinan';
+
     protected function getHeaderActions(): array
     {
         return [
