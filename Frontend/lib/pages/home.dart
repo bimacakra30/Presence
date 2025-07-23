@@ -10,6 +10,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../utils/cloudinary_service.dart';
 import '../components/home_widgets.dart';
 import '../utils/presensi_utils.dart';
+import '../components/maps_location_widget.dart';
 import 'settings_page.dart';
 
 class HomePage extends StatefulWidget {
@@ -24,6 +25,7 @@ class _HomePageState extends State<HomePage> {
   DateTime? clockInTime;
   DateTime? clockOutTime;
   bool? lateStatus;
+  final GlobalKey<MapLocationWidgetState> _mapKey = GlobalKey<MapLocationWidgetState>(); // Ubah ke MapLocationWidgetState
 
   @override
   void initState() {
@@ -45,17 +47,14 @@ class _HomePageState extends State<HomePage> {
   Future<void> fetchPresensiHariIni() async {
     try {
       final data = await fetchPresensiHariIniUtil();
-
       if (data != null) {
         setState(() {
           if (data['clockIn'] != null) {
             clockInTime = DateTime.parse(data['clockIn']);
           }
-
           if (data['clockOut'] != null) {
             clockOutTime = DateTime.parse(data['clockOut']);
           }
-
           if (data['late'] != null) {
             lateStatus = data['late'];
           }
@@ -63,55 +62,48 @@ class _HomePageState extends State<HomePage> {
       }
     } catch (e) {
       debugPrint('Error fetching presensi: $e');
-
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Gagal memuat data presensi: $e')));
+      _showMessage('Gagal memuat data presensi: $e');
     }
+  }
+
+  Future<void> _handleRefresh() async {
+    _showMessage('Memperbarui data...');
+    await Future.wait([
+      fetchUsername(),
+      fetchPresensiHariIni(),
+      _mapKey.currentState?.refreshLocation() ?? Future.value(),
+    ]);
+    _showMessage('Data berhasil diperbarui');
   }
 
   Future<void> _ambilFotoDanUpload() async {
     final picker = ImagePicker();
     try {
-      // Ambil foto dari kamera
       final XFile? photo = await picker.pickImage(source: ImageSource.camera);
       if (photo == null) {
         _showMessage('Pengambilan foto dibatalkan');
         return;
       }
-
-      // Upload foto ke Cloudinary
       _showMessage('Mengupload foto ke Cloudinary...');
       final file = File(photo.path);
-      final uploadResult = await CloudinaryService.uploadImageToCloudinary(
-        file,
-      );
+      final uploadResult = await CloudinaryService.uploadImageToCloudinary(file);
       if (uploadResult == null || uploadResult['url'] == null) {
         _showMessage('Gagal upload foto ke Cloudinary');
         return;
       }
-
-      // Ambil data pengguna
       final prefs = await SharedPreferences.getInstance();
-      final uid =
-          FirebaseAuth.instance.currentUser?.uid ?? prefs.getString('uid');
+      final uid = FirebaseAuth.instance.currentUser?.uid ?? prefs.getString('uid');
       if (uid == null) {
         _showMessage('User tidak ditemukan, silakan login ulang');
         return;
       }
-
-      // Proses presence
       final now = DateTime.now();
       final existingQuery = await FirebaseFirestore.instance
           .collection('presence')
           .where('uid', isEqualTo: uid)
-          .where(
-            'date',
-            isEqualTo: DateTime(now.year, now.month, now.day).toIso8601String(),
-          )
+          .where('date', isEqualTo: DateTime(now.year, now.month, now.day).toIso8601String())
           .limit(1)
           .get();
-
       await _handleAttendance(
         uid: uid,
         username: username,
@@ -120,7 +112,6 @@ class _HomePageState extends State<HomePage> {
         now: now,
         existingQuery: existingQuery,
       );
-
       await fetchPresensiHariIni();
     } catch (e) {
       debugPrint('Error saat proses foto dan upload: $e');
@@ -141,25 +132,16 @@ class _HomePageState extends State<HomePage> {
       const workStartHour = 8;
       const workEndHour = 17;
       final presenceRef = FirebaseFirestore.instance.collection('presence');
-
       if (existingQuery.docs.isEmpty) {
-        final workStartTime = DateTime(
-          now.year,
-          now.month,
-          now.day,
-          workStartHour,
-        );
+        final workStartTime = DateTime(now.year, now.month, now.day, workStartHour);
         final isLate = now.isAfter(workStartTime);
-
         String? lateDuration;
-
         if (isLate) {
           final duration = now.difference(workStartTime);
           final hours = duration.inHours;
           final minutes = duration.inMinutes % 60;
           lateDuration = '${hours > 0 ? '$hours jam ' : ''}$minutes menit';
         }
-
         await presenceRef.add({
           'uid': uid,
           'name': username,
@@ -170,41 +152,34 @@ class _HomePageState extends State<HomePage> {
           'late': isLate,
           if (lateDuration != null) 'lateDuration': lateDuration,
         });
-
         setState(() {
           clockInTime = now;
           lateStatus = isLate;
         });
-
         _showMessage('Berhasil Clock In');
       } else {
-        // Handle Clock Out
         final doc = existingQuery.docs.first;
         final data = doc.data() as Map<String, dynamic>;
         final hasClockedOut = data['clockOut'] != null;
         final canClockOut = now.hour >= workEndHour;
-
         if (hasClockedOut) {
           _showMessage('Anda sudah Clock Out hari ini');
           return;
         }
-
         if (!canClockOut) {
           _showMessage('Clock Out hanya tersedia setelah jam 17:00');
           return;
         }
-
         await presenceRef.doc(doc.id).update({
           'clockOut': now.toIso8601String(),
           'fotoClockOut': imageUrl,
           'fotoClockOutPublicId': publicId,
         });
-
         _showMessage('Berhasil Clock Out');
       }
     } catch (e) {
       _showMessage('Terjadi kesalahan saat presensi: $e');
-      rethrow; // Rethrow untuk debugging jika diperlukan
+      rethrow;
     }
   }
 
@@ -224,20 +199,25 @@ class _HomePageState extends State<HomePage> {
   Widget build(BuildContext context) {
     return Scaffold(
       body: SafeArea(
-        child: ListView(
-          padding: EdgeInsets.only(
-            bottom: MediaQuery.of(context).viewPadding.bottom + 16,
+        child: RefreshIndicator(
+          onRefresh: _handleRefresh,
+          child: ListView(
+            padding: EdgeInsets.only(
+              bottom: MediaQuery.of(context).viewPadding.bottom + 16,
+            ),
+            children: [
+              _buildHeader(),
+              _buildInfoCard(),
+              _buildPresensiButton(),
+              const SizedBox(height: 20),
+              MapLocationWidget(key: _mapKey),
+              const SizedBox(height: 20),
+              _buildMenuUtamaTitle(),
+              const SizedBox(height: 12),
+              _buildMenuIcons(),
+              const SizedBox(height: 32),
+            ],
           ),
-          children: [
-            _buildHeader(),
-            _buildInfoCard(),
-            _buildPresensiButton(),
-            const SizedBox(height: 20),
-            _buildMenuUtamaTitle(),
-            const SizedBox(height: 12),
-            _buildMenuIcons(),
-            const SizedBox(height: 32),
-          ],
         ),
       ),
     );
@@ -307,7 +287,6 @@ class _HomePageState extends State<HomePage> {
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Kolom Kiri - Informasi Presensi
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -318,14 +297,8 @@ class _HomePageState extends State<HomePage> {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      DateFormat(
-                        'EEEE, dd MMMM yyyy',
-                        'id_ID',
-                      ).format(DateTime.now()),
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 15,
-                      ),
+                      DateFormat('EEEE, dd MMMM yyyy', 'id_ID').format(DateTime.now()),
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
                     ),
                     const SizedBox(height: 8),
                     Text(
@@ -345,11 +318,7 @@ class _HomePageState extends State<HomePage> {
                   ],
                 ),
               ),
-
-              // Spacer antara dua kolom
               const SizedBox(width: 16),
-
-              // Kolom Kanan - Jadwal dan Pulang
               Column(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
@@ -382,11 +351,7 @@ class _HomePageState extends State<HomePage> {
             children: const [
               StatusInfo(label: "Hadir", count: "7 Hari", color: Colors.green),
               StatusInfo(label: "Izin", count: "0 Hari", color: Colors.orange),
-              StatusInfo(
-                label: "Tidak Hadir",
-                count: "0 Hari",
-                color: Colors.red,
-              ),
+              StatusInfo(label: "Tidak Hadir", count: "0 Hari", color: Colors.red),
             ],
           ),
         ],
@@ -399,9 +364,7 @@ class _HomePageState extends State<HomePage> {
       margin: const EdgeInsets.symmetric(horizontal: 24),
       width: double.infinity,
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFF00BCD4), Color(0xFF00ACC1)],
-        ),
+        gradient: const LinearGradient(colors: [Color(0xFF00BCD4), Color(0xFF00ACC1)]),
         borderRadius: BorderRadius.circular(20),
       ),
       child: MaterialButton(
@@ -413,11 +376,7 @@ class _HomePageState extends State<HomePage> {
             SizedBox(height: 4),
             Text(
               "Presensi Sekarang",
-              style: TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.bold,
-                fontSize: 16,
-              ),
+              style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
             ),
             Text(
               "(Pastikan berada di Lingkungan kantor)",
@@ -430,14 +389,14 @@ class _HomePageState extends State<HomePage> {
   }
 
   Widget _buildMenuUtamaTitle() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+    return const Padding(
+      padding: EdgeInsets.symmetric(horizontal: 24, vertical: 16),
       child: Text(
         "Menu Utama",
-        style: const TextStyle(
-          fontSize: 20, // Ukuran font lebih besar
+        style: TextStyle(
+          fontSize: 20,
           fontWeight: FontWeight.bold,
-          color: Colors.black, // Warna teks
+          color: Colors.black,
         ),
       ),
     );
@@ -447,10 +406,10 @@ class _HomePageState extends State<HomePage> {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 24),
       child: GridView.count(
-        crossAxisCount: 2, // Mengatur jumlah kolom
-        shrinkWrap: true, // Menghindari overflow
-        physics: const NeverScrollableScrollPhysics(), // Menonaktifkan scroll
-        childAspectRatio: 1.2, // Rasio aspek untuk ikon
+        crossAxisCount: 2,
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+        childAspectRatio: 1.2,
         children: const [
           MenuIcon(icon: Icons.assignment_outlined, label: "Riwayat Presensi"),
           MenuIcon(icon: Icons.location_on_outlined, label: "Lokasi"),
