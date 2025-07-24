@@ -12,6 +12,12 @@ class PresenceChart extends ChartWidget
 
     // Tambahkan filter dropdown
     protected static ?string $pollingInterval = null;
+    
+    // Atur column span untuk membuat chart memanjang
+    protected int | string | array $columnSpan = 6;
+    
+    // Atur tinggi chart
+    protected static ?string $maxHeight = '300px';
 
     protected function getFilters(): ?array
     {
@@ -38,13 +44,13 @@ class PresenceChart extends ChartWidget
     protected function getDailyData(): array
     {
         $data = Presence::selectRaw('DATE(created_at) as date, COUNT(*) as total')
-            ->where('created_at', '>=', now()->subDays(30))
+            ->where('created_at', '>=', now()->subDays(7))
             ->groupBy('date')
             ->orderBy('date')
             ->get();
 
-        $labels = collect(range(0, 29))->map(function ($i) {
-            return Carbon::now()->subDays(29 - $i)->format('Y-m-d');
+        $labels = collect(range(0, 7))->map(function ($i) {
+            return Carbon::now()->subDays(7 - $i)->format('Y-m-d');
         });
 
         $dataset = $labels->map(fn($date) =>
@@ -68,7 +74,7 @@ class PresenceChart extends ChartWidget
     protected function getWeeklyData(): array
     {
         $data = Presence::selectRaw('YEARWEEK(created_at, 1) as week, COUNT(*) as total')
-            ->where('created_at', '>=', now()->subWeeks(12))
+            ->where('created_at', '>=', now()->subWeeks(4))
             ->groupBy('week')
             ->orderBy('week')
             ->get();
@@ -131,6 +137,34 @@ class PresenceChart extends ChartWidget
 
     protected function getType(): string
     {
-        return 'line';
+        return 'line'; // Atau 'line', 'bar', dll sesuai kebutuhan
+    }
+    
+    // Override options untuk mengatur responsiveness dan aspect ratio
+    protected function getOptions(): array
+    {
+        return [
+            'responsive' => true,
+            'maintainAspectRatio' => false,
+            'scales' => [
+                'x' => [
+                    'grid' => [
+                        'display' => true,
+                    ],
+                ],
+                'y' => [
+                    'grid' => [
+                        'display' => true,
+                    ],
+                    'beginAtZero' => true,
+                ],
+            ],
+            'plugins' => [
+                'legend' => [
+                    'display' => true,
+                    'position' => 'top',
+                ],
+            ],
+        ];
     }
 }

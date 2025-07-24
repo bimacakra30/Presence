@@ -22,7 +22,7 @@ class Employee extends Model
         'password',
         'address',
         'date_of_birth',
-        'jabatan',
+        'position',
         'status',
         'provider',
         'firestore_id',
@@ -61,6 +61,7 @@ class Employee extends Model
                 'username' => $employee->username,
                 'email' => $employee->email,
                 'password' => $employee->password,
+                'position' => $employee->position,
                 'status' => $employee->status,
                 'provider' => $employee->provider,
                 'createdAt' => now()->toISOString(),
@@ -98,6 +99,7 @@ class Employee extends Model
                 $data = [
                     'email' => $employee->email,
                     'status' => $employee->status,
+                    'position' => $employee->position,
                     'provider' => $employee->provider,
                 ];
 
@@ -114,11 +116,6 @@ class Employee extends Model
                 $service->deleteUser($employee->firestore_id);
             }
         });
-    }
-
-    public function positions()
-    {
-        return $this->hasMany(EmployeePosition::class, 'employee_id');
     }
     public function salaries()
     {

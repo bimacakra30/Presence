@@ -72,6 +72,11 @@ class EmployeeResource extends Resource
                     ->label('Date of Birth')
                     ->disabled(fn ($context) => $context === 'edit')
                     ->nullable(),
+                Forms\Components\TextInput::make('position')
+                    ->label('Jabatan')
+                    ->required()
+                    ->maxLength(255)
+                    ->nullable(),
                 Forms\Components\Select::make('status')
                     ->label('Status')
                     ->required()
@@ -124,7 +129,10 @@ class EmployeeResource extends Resource
                     ->label('Birth Date')
                     ->date()
                     ->sortable(),
-
+                Tables\Columns\TextColumn::make('position')
+                    ->label('Jabatan')
+                    ->searchable()
+                    ->sortable(),
                 Tables\Columns\ViewColumn::make('provider')
                     ->label('Provider')
                     ->view('filament.components.provider-icon'),

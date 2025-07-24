@@ -17,6 +17,9 @@ use Illuminate\Support\Facades\Log;
 use App\Exports\PresenceExport;
 use Maatwebsite\Excel\Facades\Excel;
 use Filament\Forms\Components\DatePicker;
+use App\Filament\Widgets\StatsOverview;
+use App\Filament\Widgets\PresencePieChart;
+use App\Filament\Widgets\PresenceChart;
 
 class ListPresences extends ListRecords
 {
@@ -126,6 +129,15 @@ class ListPresences extends ListRecords
                         ->success()
                         ->send();
                 }),
+        ];
+    }
+
+    protected function getHeaderWidgets(): array
+    {
+        return [
+            StatsOverview::class,
+            PresenceChart::class,
+            PresencePieChart::class,
         ];
     }
 }

@@ -5,6 +5,8 @@ namespace App\Filament\Resources\PermitResource\Pages;
 use App\Filament\Resources\PermitResource;
 use Filament\Actions;
 use Filament\Resources\Pages\ListRecords;
+use App\Filament\Widgets\StatsOverview;
+use App\Filament\Widgets\PresenceChart;
 
 class ListPermits extends ListRecords
 {

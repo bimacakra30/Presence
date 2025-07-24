@@ -15,7 +15,7 @@ class StatsOverview extends BaseWidget
     {
         return [
             Card::make('Total Karyawan', Employee::count()),
-            Card::make('Total Presensi Hari Ini', Presence::whereDate('created_at', today())->count()),
+            Card::make('Total Presensi', Presence::whereDate('created_at', today())->count()),
             Card::make('Proyek Aktif', Project::where('status', 'aktif')->count()),
         ];
     }
