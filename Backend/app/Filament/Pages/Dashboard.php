@@ -18,9 +18,9 @@ class Dashboard extends Page
     protected function getHeaderWidgets(): array
     {
         return [
+            UserProfileWidget::class,
             StatsOverview::class,
             PresencePieChart::class,
-            UserProfileWidget::class,
             PresenceChart::class,
         ];
     }

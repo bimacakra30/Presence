@@ -20,6 +20,8 @@ use Filament\Forms\Components\DatePicker;
 use App\Filament\Widgets\StatsOverview;
 use App\Filament\Widgets\PresencePieChart;
 use App\Filament\Widgets\PresenceChart;
+use Cloudinary\Configuration\Configuration;
+use Cloudinary\Api\Upload\UploadApi;
 
 class ListPresences extends ListRecords
 {
@@ -98,39 +100,45 @@ class ListPresences extends ListRecords
     {
         return [
             DeleteAction::make()
-                ->before(function (Presence $record) {
-                    Cloudinary::config([
-                        'cloud_name' => config('cloudinary.cloud.cloud_name'),
-                        'api_key' => config('cloudinary.cloud.api_key'),
-                        'api_secret' => config('cloudinary.cloud.api_secret'),
-                    ]);
-
-                    try {
-                        if ($record->public_id_clock_in) {
-                            Cloudinary::destroy($record->public_id_clock_in);
-                            Log::info('Berhasil hapus foto Clock In dari Cloudinary: ' . $record->public_id_clock_in);
-                        }
-                    } catch (\Exception $e) {
-                        Log::error("Gagal menghapus foto clock_in dari Cloudinary: {$record->public_id_clock_in}, Error: {$e->getMessage()}");
+            ->before(function (Presence $record) {
+                // Konfigurasi Cloudinary manual (sesuai env)
+                Configuration::instance([
+                    'cloud' => [
+                        'cloud_name' => env('CLOUDINARY_CLOUD_NAME'),
+                        'api_key'    => env('CLOUDINARY_API_KEY'),
+                        'api_secret' => env('CLOUDINARY_API_SECRET'),
+                    ],
+                    'url' => [
+                        'secure' => true,
+                    ],
+                ]);
+                try {
+                    if ($record->public_id_clock_in) {
+                        (new UploadApi())->destroy($record->public_id_clock_in);
+                        Log::info('Berhasil hapus foto Clock In dari Cloudinary: ' . $record->public_id_clock_in);
                     }
+                } catch (\Exception $e) {
+                    Log::error("Gagal menghapus foto clock_in dari Cloudinary: {$record->public_id_clock_in}, Error: {$e->getMessage()}");
+                }
 
-                    try {
-                        if ($record->public_id_clock_out) {
-                            Cloudinary::destroy($record->public_id_clock_out);
-                            Log::info('Berhasil hapus foto Clock Out dari Cloudinary: ' . $record->public_id_clock_out);
-                        }
-                    } catch (\Exception $e) {
-                        Log::error("Gagal menghapus foto clock_out dari Cloudinary: {$record->public_id_clock_out}, Error: {$e->getMessage()}");
+                try {
+                    if ($record->public_id_clock_out) {
+                        (new UploadApi())->destroy($record->public_id_clock_out);
+                        Log::info('Berhasil hapus foto Clock Out dari Cloudinary: ' . $record->public_id_clock_out);
                     }
-                })
-                ->after(function () {
-                    Notification::make()
-                        ->title('Presensi & Foto berhasil dihapus dari Cloudinary.')
-                        ->success()
-                        ->send();
-                }),
+                } catch (\Exception $e) {
+                    Log::error("Gagal menghapus foto clock_out dari Cloudinary: {$record->public_id_clock_out}, Error: {$e->getMessage()}");
+                }
+            })
+            ->after(function () {
+                Notification::make()
+                    ->title('Presensi & Foto berhasil dihapus dari Cloudinary.')
+                    ->success()
+                    ->send();
+            })
         ];
     }
+
 
     protected function getHeaderWidgets(): array
     {

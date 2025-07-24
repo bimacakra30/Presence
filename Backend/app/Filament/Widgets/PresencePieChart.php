@@ -6,14 +6,14 @@ use Filament\Widgets\ChartWidget;
 
 class PresencePieChart extends ChartWidget
 {
-    protected static ?string $heading = 'Perbandingan Telat vs Tepat Waktu';
+    protected static ?string $heading = 'Perbandingan (Telat : Tepat Waktu)';
 
     protected static ?string $pollingInterval = null;
 
     // Gunakan columnSpan 6 langsung untuk memastikan bersebelahan
     protected int | string | array $columnSpan = 1;
 
-    protected static ?string $maxHeight = '300px';
+    protected static ?string $maxHeight = '150px';
 
     // Tambahkan sort untuk mengatur urutan widget
     protected static ?int $sort = 1;
@@ -22,6 +22,7 @@ class PresencePieChart extends ChartWidget
     {
         return 'pie';
     }
+
 
     protected function getData(): array
     {

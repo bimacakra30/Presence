@@ -14,6 +14,7 @@ use Filament\Tables\Table;
 use Filament\Tables\Columns\ImageColumn;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
+use Illuminate\Support\Facades\Auth;
 
 class UserResource extends Resource
 {
@@ -44,6 +45,14 @@ class UserResource extends Resource
                     ->password()
                     ->required()
                     ->maxLength(255),
+                Forms\Components\Select::make('role')
+                    ->options([
+                        'superadmin' => 'Super Admin',
+                        'admin' => 'Admin',
+                    ])
+                    ->default('superadmin')
+                    ->required()
+                    ->label('Role'),
             ]);
     }
 
@@ -59,6 +68,14 @@ class UserResource extends Resource
                 Tables\Columns\TextColumn::make('name')
                     ->searchable(),
                 Tables\Columns\TextColumn::make('email')
+                    ->searchable(),
+                Tables\Columns\TextColumn::make('role')
+                    ->badge()
+                    ->colors([
+                        'success' => 'admin',
+                        'danger' => 'superadmin',
+                    ])
+                    ->formatStateUsing(fn (string $state) => ucfirst($state))
                     ->searchable(),
                 Tables\Columns\TextColumn::make('created_at')
                     ->dateTime()
@@ -88,6 +105,12 @@ class UserResource extends Resource
             //
         ];
     }
+
+    public static function canAccess(): bool
+    {
+        return Auth::user()?->role === 'superadmin';
+    }
+
 
     public static function getPages(): array
     {

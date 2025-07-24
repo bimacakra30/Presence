@@ -25,6 +25,7 @@ class User extends Authenticatable implements FilamentUser, HasAvatar
         'name',
         'email',
         'password',
+        'role',
     ];
 
     /**
@@ -57,4 +58,6 @@ class User extends Authenticatable implements FilamentUser, HasAvatar
     {
         return true; // atau logika kamu sendiri
     }
+
+    
 }

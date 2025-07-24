@@ -15,7 +15,7 @@ class PresenceChart extends ChartWidget
     // Gunakan columnSpan 6 langsung untuk memastikan bersebelahan
     protected int | string | array $columnSpan = 1;
     
-    protected static ?string $maxHeight = '300px';
+    protected static ?string $maxHeight = '150px';
 
     // Tambahkan sort untuk mengatur urutan widget
     protected static ?int $sort = 3;
