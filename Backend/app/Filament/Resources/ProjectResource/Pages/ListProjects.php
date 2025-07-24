@@ -16,4 +16,14 @@ class ListProjects extends ListRecords
             Actions\CreateAction::make(),
         ];
     }
+    public function getTitle(): string
+    {
+        return 'Daftar Proyek';
+    }
+    protected function getHeaderWidgets(): array
+    {
+        return [
+            \App\Filament\Widgets\StatsOverview::class,
+        ];
+    }
 }

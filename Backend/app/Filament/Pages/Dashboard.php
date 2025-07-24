@@ -6,6 +6,8 @@ use Filament\Pages\Page;
 use App\Filament\Widgets\StatsOverview;
 use App\Filament\Widgets\PresenceChart;
 use App\Filament\Widgets\UserProfileWidget;
+use App\Models\Presence;
+use App\Filament\Widgets\PresencePieChart;
 
 class Dashboard extends Page
 {
@@ -17,9 +19,14 @@ class Dashboard extends Page
     {
         return [
             StatsOverview::class,
+            PresencePieChart::class,
             UserProfileWidget::class,
             PresenceChart::class,
         ];
     }
+    public function getTitle(): string
+    {
+        return 'Dashboard Admin';
+    }  
 }
 

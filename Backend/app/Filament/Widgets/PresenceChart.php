@@ -10,14 +10,15 @@ class PresenceChart extends ChartWidget
 {
     protected static ?string $heading = 'Grafik Presensi';
 
-    // Tambahkan filter dropdown
     protected static ?string $pollingInterval = null;
     
-    // Atur column span untuk membuat chart memanjang
-    protected int | string | array $columnSpan = 6;
+    // Gunakan columnSpan 6 langsung untuk memastikan bersebelahan
+    protected int | string | array $columnSpan = 1;
     
-    // Atur tinggi chart
     protected static ?string $maxHeight = '300px';
+
+    // Tambahkan sort untuk mengatur urutan widget
+    protected static ?int $sort = 3;
 
     protected function getFilters(): ?array
     {
@@ -137,10 +138,9 @@ class PresenceChart extends ChartWidget
 
     protected function getType(): string
     {
-        return 'line'; // Atau 'line', 'bar', dll sesuai kebutuhan
+        return 'line';
     }
     
-    // Override options untuk mengatur responsiveness dan aspect ratio
     protected function getOptions(): array
     {
         return [

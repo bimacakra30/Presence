@@ -136,8 +136,8 @@ class ListPresences extends ListRecords
     {
         return [
             StatsOverview::class,
-            PresenceChart::class,
             PresencePieChart::class,
+            PresenceChart::class,
         ];
     }
 }

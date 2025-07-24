@@ -10,9 +10,13 @@ class PresencePieChart extends ChartWidget
 
     protected static ?string $pollingInterval = null;
 
-    protected int | string | array $columnSpan = 6;
+    // Gunakan columnSpan 6 langsung untuk memastikan bersebelahan
+    protected int | string | array $columnSpan = 1;
 
     protected static ?string $maxHeight = '300px';
+
+    // Tambahkan sort untuk mengatur urutan widget
+    protected static ?int $sort = 1;
 
     protected function getType(): string
     {
@@ -30,18 +34,19 @@ class PresencePieChart extends ChartWidget
                 [
                     'label' => 'Status Presensi',
                     'data' => [$tepat, $telat],
-                    'backgroundColor' => ['#10b981', '#ef4444'], // hijau & merah
+                    'backgroundColor' => ['#0057c9ff', '#ffae00ff'], // hijau & merah
                     'hoverOffset' => 4,
                 ],
             ],
             'labels' => ['Tepat Waktu', 'Telat'],
         ];
-    }
+    }   
 
     protected function getOptions(): array
     {
         return [
             'responsive' => true,
+            'maintainAspectRatio' => false,
             'plugins' => [
                 'legend' => [
                     'display' => true,
