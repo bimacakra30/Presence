@@ -26,7 +26,9 @@ class AdminPanelProvider extends PanelProvider
             ->default()
             ->id('admin')
             ->path('admin')
+            ->brandLogo(asset('images/Logo.png'))
             ->brandName('Presence Admin')
+            ->brandLogoHeight('2.5rem')
             ->login()
             ->colors([
                 'danger' => Color::Rose,

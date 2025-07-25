@@ -19,12 +19,12 @@ use App\Models\User;
 class Profile extends Page
 {
     protected static ?string $navigationIcon = 'heroicon-o-user-circle';
-    protected static ?string $navigationLabel = 'Profil Saya';
+    protected static ?string $navigationLabel = 'Informasi Akun';
+    protected static ?string $navigationGroup = 'Pengaturan';
     protected static string $view = 'filament.pages.profile';
-    protected static ?string $title = 'Profil Saya';
+    protected static ?int $navigationSort = 1;
     
     public ?array $profileData = [];
-    public ?array $passwordData = [];
     
     public function mount(): void
     {
@@ -47,7 +47,6 @@ class Profile extends Page
     {
         return [
             'profileForm',
-            'passwordForm',
         ];
     }
     
@@ -55,7 +54,7 @@ class Profile extends Page
     {
         return $form
             ->schema([
-                Section::make('Profile Information')
+                Section::make('Informasi Profil')
                     ->description('Ubah Informasi Akun Anda.')
                     ->schema([
                         FileUpload::make('photo')
@@ -91,38 +90,6 @@ class Profile extends Page
             ->statePath('profileData');
     }
     
-    public function passwordForm(Form $form): Form
-    {
-        return $form
-            ->schema([
-                Section::make('Update Password')
-                    ->description('Ensure your account is using a long, random password to stay secure.')
-                    ->schema([
-                        TextInput::make('current_password')
-                            ->label('Current Password')
-                            ->password()
-                            ->required()
-                            ->currentPassword(),
-                        
-                        TextInput::make('password')
-                            ->label('New Password')
-                            ->password()
-                            ->required()
-                            ->rule(Password::default())
-                            ->dehydrateStateUsing(fn ($state) => Hash::make($state))
-                            ->live(debounce: 500)
-                            ->same('password_confirmation'),
-                        
-                        TextInput::make('password_confirmation')
-                            ->label('Confirm Password')
-                            ->password()
-                            ->required()
-                            ->dehydrated(false),
-                    ]),
-            ])
-            ->statePath('passwordData');
-    }
-    
     public function updateProfile(): void
     {
         try {
@@ -140,42 +107,12 @@ class Profile extends Page
         }
     }
     
-    public function updatePassword(): void
-    {
-        try {
-            $data = $this->passwordForm->getState();
-            
-            User::where('id', Auth::id())->update([
-                'password' => $data['password'],
-            ]);
-            
-            $this->passwordForm->fill();
-            
-            Notification::make()
-                ->success()
-                ->title('Password updated successfully')
-                ->send();
-                
-        } catch (Halt $exception) {
-            return;
-        }
-    }
-    
     protected function getFormActions(): array
     {
         return [
             Action::make('updateProfile')
                 ->label('Update Profile')
                 ->submit('updateProfile'),
-        ];
-    }
-    
-    protected function getPasswordFormActions(): array
-    {
-        return [
-            Action::make('updatePassword')
-                ->label('Update Password')
-                ->submit('updatePassword'),
         ];
     }
     

@@ -15,6 +15,7 @@ use Filament\Tables\Columns\ImageColumn;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
 use Illuminate\Support\Facades\Auth;
+use App\Filament\Resources\UserResource\Pages\CreateUser;
 
 class UserResource extends Resource
 {
@@ -43,8 +44,14 @@ class UserResource extends Resource
                     ->maxLength(255),
                 Forms\Components\TextInput::make('password')
                     ->password()
-                    ->required()
-                    ->maxLength(255),
+                    ->maxLength(255)
+                    ->visible(fn ($livewire) => $livewire instanceof CreateUser)
+                    ->label('Password')
+                    ->dehydrated(fn ($state) => filled($state)) // hanya kirim ke model jika diisi
+                    ->required(fn ($livewire) => $livewire instanceof \App\Filament\Resources\UserResource\Pages\CreateUser)
+                    ->hint(fn ($livewire) => $livewire instanceof \App\Filament\Resources\UserResource\Pages\EditUser
+                        ? 'Kosongkan jika tidak ingin mengubah password'
+                        : null),
                 Forms\Components\Select::make('role')
                     ->options([
                         'superadmin' => 'Super Admin',
@@ -53,6 +60,14 @@ class UserResource extends Resource
                     ->default('superadmin')
                     ->required()
                     ->label('Role'),
+                Forms\Components\Select::make('status')
+                    ->options([
+                        'active' => 'Active',
+                        'inactive' => 'Inactive',
+                    ])
+                    ->default('active')
+                    ->required()
+                    ->label('Status'),
             ]);
     }
 
@@ -72,8 +87,16 @@ class UserResource extends Resource
                 Tables\Columns\TextColumn::make('role')
                     ->badge()
                     ->colors([
-                        'success' => 'admin',
-                        'danger' => 'superadmin',
+                        'warning' => 'admin',
+                        'primary' => 'superadmin',
+                    ])
+                    ->formatStateUsing(fn (string $state) => ucfirst($state))
+                    ->searchable(),
+                Tables\Columns\TextColumn::make('status')
+                    ->badge()
+                    ->colors([
+                        'success' => 'active',
+                        'danger' => 'inactive',
                     ])
                     ->formatStateUsing(fn (string $state) => ucfirst($state))
                     ->searchable(),

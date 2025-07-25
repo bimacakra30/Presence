@@ -8,6 +8,7 @@ use App\Filament\Widgets\PresenceChart;
 use App\Filament\Widgets\UserProfileWidget;
 use App\Models\Presence;
 use App\Filament\Widgets\PresencePieChart;
+use App\Filament\Widgets\AppLabel;
 
 class Dashboard extends Page
 {
@@ -19,6 +20,7 @@ class Dashboard extends Page
     {
         return [
             UserProfileWidget::class,
+            AppLabel::class,
             StatsOverview::class,
             PresencePieChart::class,
             PresenceChart::class,

@@ -26,6 +26,7 @@ class User extends Authenticatable implements FilamentUser, HasAvatar
         'email',
         'password',
         'role',
+        'status',
     ];
 
     /**
@@ -56,7 +57,7 @@ class User extends Authenticatable implements FilamentUser, HasAvatar
     }
     public function canAccessPanel(Panel $panel): bool
     {
-        return true; // atau logika kamu sendiri
+        return $this->status === 'active'; // atau logika kamu sendiri
     }
 
     
