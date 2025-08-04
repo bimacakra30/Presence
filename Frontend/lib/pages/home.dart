@@ -25,7 +25,7 @@ class _HomePageState extends State<HomePage> {
   DateTime? clockInTime;
   DateTime? clockOutTime;
   bool? lateStatus;
-  final GlobalKey<MapLocationWidgetState> _mapKey = GlobalKey<MapLocationWidgetState>(); // Ubah ke MapLocationWidgetState
+  final GlobalKey<MapLocationWidgetState> _mapKey = GlobalKey();
 
   @override
   void initState() {
@@ -365,7 +365,20 @@ class _HomePageState extends State<HomePage> {
       ),
       child: MaterialButton(
         padding: const EdgeInsets.symmetric(vertical: 16),
-        onPressed: _ambilFotoDanUpload,
+        onPressed: () {
+          final isAllowed = _mapKey.currentState?.userIsWithinRadius() ?? false;
+
+          if (isAllowed) {
+            _ambilFotoDanUpload(); // Aksi presensi
+          } else {
+            Fluttertoast.showToast(
+              msg: 'Kamu berada di luar area kantor!',
+              toastLength: Toast.LENGTH_SHORT,
+              backgroundColor: Colors.red,
+              textColor: Colors.white,
+            );
+          }
+        },
         child: const Column(
           children: [
             Icon(Icons.qr_code_scanner, color: Colors.white, size: 28),
