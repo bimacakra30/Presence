@@ -84,11 +84,11 @@ class _HomePageState extends State<HomePage> {
         _showMessage('Pengambilan foto dibatalkan');
         return;
       }
-      _showMessage('Mengupload foto ke Cloudinary...');
+      _showMessage('Mengupload foto.....');
       final file = File(photo.path);
       final uploadResult = await CloudinaryService.uploadImageToCloudinary(file);
       if (uploadResult == null || uploadResult['url'] == null) {
-        _showMessage('Gagal upload foto ke Cloudinary');
+        _showMessage('Gagal upload Foto');
         return;
       }
       final prefs = await SharedPreferences.getInstance();
@@ -212,10 +212,6 @@ class _HomePageState extends State<HomePage> {
               const SizedBox(height: 20),
               MapLocationWidget(key: _mapKey),
               const SizedBox(height: 20),
-              _buildMenuUtamaTitle(),
-              const SizedBox(height: 12),
-              _buildMenuIcons(),
-              const SizedBox(height: 32),
             ],
           ),
         ),
@@ -384,39 +380,6 @@ class _HomePageState extends State<HomePage> {
             ),
           ],
         ),
-      ),
-    );
-  }
-
-  Widget _buildMenuUtamaTitle() {
-    return const Padding(
-      padding: EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-      child: Text(
-        "Menu Utama",
-        style: TextStyle(
-          fontSize: 20,
-          fontWeight: FontWeight.bold,
-          color: Colors.black,
-        ),
-      ),
-    );
-  }
-
-  Widget _buildMenuIcons() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 24),
-      child: GridView.count(
-        crossAxisCount: 2,
-        shrinkWrap: true,
-        physics: const NeverScrollableScrollPhysics(),
-        childAspectRatio: 1.2,
-        children: const [
-          MenuIcon(icon: Icons.assignment_outlined, label: "Riwayat Presensi"),
-          MenuIcon(icon: Icons.location_on_outlined, label: "Lokasi"),
-          MenuIcon(icon: Icons.mail_outline, label: "Pengajuan Izin"),
-          MenuIcon(icon: Icons.event_note_outlined, label: "Aktivitas"),
-          MenuIcon(icon: Icons.attach_money_outlined, label: "Informasi Gaji"),
-        ],
       ),
     );
   }

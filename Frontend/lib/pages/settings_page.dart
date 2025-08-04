@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'login_page.dart';
+import 'history.dart';
 
 class SettingsPage extends StatelessWidget {
   const SettingsPage({super.key});
@@ -32,6 +33,15 @@ class SettingsPage extends StatelessWidget {
           const SizedBox(height: 10),
           _SectionTitle(icon: Icons.person, title: 'Account'),
           const SizedBox(height: 6),
+          _SectionItem(
+            title: 'Present History',
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const AttendanceHistoryPage()),
+              );
+            },
+          ),
           _SectionItem(title: 'Edit Profile', onTap: () {}),
           _SectionItem(title: 'Change Password', onTap: () {}),
 
