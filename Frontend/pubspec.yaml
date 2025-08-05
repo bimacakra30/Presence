@@ -1,4 +1,4 @@
-name: presence
+name: Presence
 description: "A new Flutter project."
 # The following line prevents the package from being accidentally published to
 # pub.dev using `flutter pub publish`. This is preferred for private packages.
@@ -52,6 +52,15 @@ dependencies:
   latlong2: ^0.9.1
   geolocator: ^14.0.2
   table_calendar: any
+  flutter_launcher_icons: any
+
+flutter_icons:
+  android: true
+  ios: true
+  image_path: "assets/images/app_logo.png"
+  min_sdk_android: 21
+  adaptive_icon_background: "assets/images/app_logo.png"
+  adaptive_icon_foreground: "assets/images/app_logo.png"
 
 dev_dependencies:
   flutter_test:

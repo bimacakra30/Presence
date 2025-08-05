@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'loading_page.dart';
-import 'package:presence/components/dialog/forgot_password_dialog.dart';
+import 'package:Presence/components/dialog/forgot_password_dialog.dart';
 import 'home.dart';
 import 'package:bcrypt/bcrypt.dart';
 
