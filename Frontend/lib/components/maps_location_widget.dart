@@ -16,7 +16,7 @@ class MapLocationWidgetState extends State<MapLocationWidget> {
   LatLng? _currentPosition;
   late Future<bool> _permissionFuture;
 
-  final LatLng centerLocation = LatLng(-7.690909, 111.604621);
+  final LatLng centerLocation = LatLng(-7.852752, 111.456328);
   final double allowedRadiusInMeters = 50;
   bool isWithinRadius = false;
 

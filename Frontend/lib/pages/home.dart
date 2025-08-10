@@ -25,6 +25,8 @@ class _HomePageState extends State<HomePage> {
   DateTime? clockInTime;
   DateTime? clockOutTime;
   bool? lateStatus;
+  Map<String, int> monthlySummary = {'hadir': 0, 'terlambat': 0, 'tidakHadir': 0};
+  bool isLoadingSummary = false;
   final GlobalKey<MapLocationWidgetState> _mapKey = GlobalKey();
 
   @override
@@ -32,6 +34,7 @@ class _HomePageState extends State<HomePage> {
     super.initState();
     fetchUsername();
     fetchPresensiHariIni();
+    fetchMonthlyAttendanceSummary();
   }
 
   Future<void> fetchUsername() async {
@@ -66,11 +69,31 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
+    Future<void> fetchMonthlyAttendanceSummary() async {
+    setState(() {
+      isLoadingSummary = true;
+    });
+    try {
+      final summary = await fetchMonthlyAttendance();
+      setState(() {
+        monthlySummary = summary;
+      });
+    } catch (e) {
+      debugPrint('Error fetching monthly attendance: $e');
+      _showMessage('Gagal memuat rekap presensi: $e');
+    } finally {
+      setState(() {
+        isLoadingSummary = false;
+      });
+    }
+  }
+
   Future<void> _handleRefresh() async {
     _showMessage('Memperbarui data...');
     await Future.wait([
       fetchUsername(),
       fetchPresensiHariIni(),
+      fetchMonthlyAttendanceSummary(),
       _mapKey.currentState?.refreshLocation() ?? Future.value(),
     ]);
     _showMessage('Data berhasil diperbarui');
@@ -113,6 +136,7 @@ class _HomePageState extends State<HomePage> {
         existingQuery: existingQuery,
       );
       await fetchPresensiHariIni();
+      await fetchMonthlyAttendanceSummary();
     } catch (e) {
       debugPrint('Error saat proses foto dan upload: $e');
       _showMessage('Terjadi kesalahan saat presensi: $e');
@@ -342,14 +366,28 @@ class _HomePageState extends State<HomePage> {
             style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 12),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            children: const [
-              StatusInfo(label: "Hadir", count: "7 Hari", color: Colors.green),
-              StatusInfo(label: "Izin", count: "0 Hari", color: Colors.orange),
-              StatusInfo(label: "Tidak Hadir", count: "0 Hari", color: Colors.red),
-            ],
-          ),
+          isLoadingSummary
+              ? const Center(child: CircularProgressIndicator())
+              : Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: [
+                    StatusInfo(
+                      label: "Hadir",
+                      count: "${monthlySummary['hadir']} Hari",
+                      color: const Color(0xFF4CAF50), // Green from AttendanceHistoryPage
+                    ),
+                    StatusInfo(
+                      label: "Terlambat",
+                      count: "${monthlySummary['terlambat']} Hari",
+                      color: const Color(0xFFFF9800), // Orange from AttendanceHistoryPage
+                    ),
+                    StatusInfo(
+                      label: "Tidak Hadir",
+                      count: "${monthlySummary['tidakHadir']} Hari",
+                      color: const Color(0xFFF44336), // Red from AttendanceHistoryPage
+                    ),
+                  ],
+                ),
         ],
       ),
     );
