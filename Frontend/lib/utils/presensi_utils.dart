@@ -1,31 +1,12 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'holidays.dart';
 
 Future<String?> getCurrentUid() async {
   final prefs = await SharedPreferences.getInstance();
   return FirebaseAuth.instance.currentUser?.uid ?? prefs.getString('uid');
 }
-
-// Future<Map<String, dynamic>?> fetchPresensiHariIni() async {
-//   final uid = await getCurrentUid();
-//   if (uid == null) return null;
-
-//   final now = DateTime.now();
-//   final todayStart = DateTime(now.year, now.month, now.day);
-
-//   final query = await FirebaseFirestore.instance
-//       .collection('presence')
-//       .where('uid', isEqualTo: uid)
-//       .where('date', isEqualTo: todayStart.toIso8601String())
-//       .limit(1)
-//       .get();
-
-//   if (query.docs.isNotEmpty) {
-//     return query.docs.first.data();
-//   }
-//   return null;
-// }
 
 Future<Map<String, dynamic>?> fetchPresensiHariIniUtil() async {
   final uid = await getCurrentUid();
@@ -72,7 +53,11 @@ Future<Map<String, int>> fetchMonthlyAttendance() async {
     final dateString = data['date'] as String?;
     if (dateString != null) {
       final parsedDate = DateTime.parse(dateString);
-      final dateOnly = DateTime(parsedDate.year, parsedDate.month, parsedDate.day);
+      final dateOnly = DateTime(
+        parsedDate.year,
+        parsedDate.month,
+        parsedDate.day,
+      );
       attendanceDays.add(dateOnly);
 
       if (data['clockIn'] != null && data['clockOut'] != null) {
@@ -87,14 +72,16 @@ Future<Map<String, int>> fetchMonthlyAttendance() async {
 
   for (int day = 1; day <= now.day; day++) {
     final currentDay = DateTime(now.year, now.month, day);
-    if (!attendanceDays.contains(currentDay)) {
-      tidakHadir++;
+    final isNationalHoliday = parsedHolidays.any(
+      (holiday) => isSameDay(holiday, currentDay),
+    );
+
+    if (currentDay.weekday != DateTime.sunday && !isNationalHoliday) {
+      if (!attendanceDays.contains(currentDay)) {
+        tidakHadir++;
+      }
     }
   }
 
-  return {
-    'hadir': hadir,
-    'terlambat': terlambat,
-    'tidakHadir': tidakHadir,
-  };
+  return {'hadir': hadir, 'terlambat': terlambat, 'tidakHadir': tidakHadir};
 }
