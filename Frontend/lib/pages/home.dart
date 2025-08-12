@@ -1,6 +1,9 @@
+// lib/pages/home_page.dart
+
 import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
@@ -10,9 +13,10 @@ import '../utils/cloudinary_service.dart';
 import '../components/home_widgets.dart';
 import '../utils/presensi_utils.dart';
 import '../utils/holidays.dart';
-import '../utils/notification_utils.dart'; // Impor file baru
+import '../utils/notification_utils.dart';
 import '../components/maps_location_widget.dart';
 import 'settings_page.dart';
+import 'permit_page.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -114,7 +118,6 @@ class _HomePageState extends State<HomePage> {
 
   Future<void> _ambilFotoDanUpload() async {
     final now = DateTime.now();
-
     final isSunday = now.weekday == DateTime.sunday;
     final isNationalHoliday = parsedHolidays.any(
       (holiday) => isSameDay(holiday, now),
@@ -123,23 +126,13 @@ class _HomePageState extends State<HomePage> {
     if (isSunday || isNationalHoliday) {
       String message = 'Presensi tidak tersedia hari ini karena ';
       List<String> reasons = [];
-
-      if (isSunday) {
-        reasons.add('Hari Minggu');
-      }
-
+      if (isSunday) reasons.add('Hari Minggu');
       if (isNationalHoliday) {
         final holidayDescription = getHolidayDescription(now);
-        if (holidayDescription != null) {
-          reasons.add(holidayDescription);
-        } else {
-          reasons.add('hari libur');
-        }
+        if (holidayDescription != null) reasons.add(holidayDescription);
+        else reasons.add('hari libur');
       }
-
-      // Gabungkan alasan menjadi satu pesan
       message += reasons.join(' dan ');
-
       showCustomSnackBar(context, message, isError: true);
       return;
     }
@@ -151,13 +144,9 @@ class _HomePageState extends State<HomePage> {
         showCustomSnackBar(context, 'Pengambilan foto dibatalkan');
         return;
       }
-
       showCustomSnackBar(context, 'Mengupload foto.....');
       final file = File(photo.path);
-      final uploadResult = await CloudinaryService.uploadImageToCloudinary(
-        file,
-      );
-
+      final uploadResult = await CloudinaryService.uploadImageToCloudinary(file);
       if (uploadResult == null || uploadResult['url'] == null) {
         showCustomSnackBar(context, 'Gagal upload Foto', isError: true);
         return;
@@ -166,13 +155,8 @@ class _HomePageState extends State<HomePage> {
       final prefs = await SharedPreferences.getInstance();
       final uid =
           FirebaseAuth.instance.currentUser?.uid ?? prefs.getString('uid');
-
       if (uid == null) {
-        showCustomSnackBar(
-          context,
-          'User tidak ditemukan, silakan login ulang',
-          isError: true,
-        );
+        showCustomSnackBar(context, 'User tidak ditemukan, silakan login ulang', isError: true);
         return;
       }
 
@@ -197,11 +181,7 @@ class _HomePageState extends State<HomePage> {
       await fetchMonthlyAttendanceSummary();
     } catch (e) {
       debugPrint('Error saat proses foto dan upload: $e');
-      showCustomSnackBar(
-        context,
-        'Terjadi kesalahan saat presensi: $e',
-        isError: true,
-      );
+      showCustomSnackBar(context, 'Terjadi kesalahan saat presensi: $e', isError: true);
     }
   }
 
@@ -220,12 +200,7 @@ class _HomePageState extends State<HomePage> {
       final presenceRef = FirebaseFirestore.instance.collection('presence');
 
       if (existingQuery.docs.isEmpty) {
-        final workStartTime = DateTime(
-          now.year,
-          now.month,
-          now.day,
-          workStartHour,
-        );
+        final workStartTime = DateTime(now.year, now.month, now.day, workStartHour);
         final isLate = now.isAfter(workStartTime);
         String? lateDuration;
         if (isLate) {
@@ -257,20 +232,12 @@ class _HomePageState extends State<HomePage> {
         final canClockOut = now.hour >= workEndHour;
 
         if (hasClockedOut) {
-          showCustomSnackBar(
-            context,
-            'Anda sudah Clock Out hari ini',
-            isError: true,
-          );
+          showCustomSnackBar(context, 'Anda sudah Clock Out hari ini', isError: true);
           return;
         }
 
         if (!canClockOut) {
-          showCustomSnackBar(
-            context,
-            'Clock Out hanya tersedia setelah jam 17:00',
-            isError: true,
-          );
+          showCustomSnackBar(context, 'Clock Out hanya tersedia setelah jam 17:00', isError: true);
           return;
         }
 
@@ -279,89 +246,114 @@ class _HomePageState extends State<HomePage> {
           'fotoClockOut': imageUrl,
           'fotoClockOutPublicId': publicId,
         });
-
         showCustomSnackBar(context, 'Berhasil Clock Out');
       }
     } catch (e) {
-      showCustomSnackBar(
-        context,
-        'Terjadi kesalahan saat presensi: $e',
-        isError: true,
-      );
+      showCustomSnackBar(context, 'Terjadi kesalahan saat presensi: $e', isError: true);
       rethrow;
     }
   }
 
-  // Fungsi _showMessage yang lama sudah dihapus
-
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: SafeArea(
-        child: RefreshIndicator(
-          onRefresh: _handleRefresh,
-          child: ListView(
-            padding: EdgeInsets.only(
-              bottom: MediaQuery.of(context).viewPadding.bottom + 16,
-            ),
-            children: [
-              _buildHeader(),
-              _buildInfoCard(),
-              _buildPresensiButton(),
-              const SizedBox(height: 20),
-              MapLocationWidget(key: _mapKey),
-              const SizedBox(height: 20),
-            ],
-          ),
-        ),
+    // Mengatur warna ikon status bar agar terlihat jelas
+    SystemChrome.setSystemUIOverlayStyle(
+      const SystemUiOverlayStyle(
+        statusBarIconBrightness: Brightness.light,
       ),
     );
-  }
 
-  Widget _buildHeader() {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          colors: [Color(0xFF00A0E3), Color(0xFFB2EBF2)],
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-        ),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  "Hi, $username",
-                  style: const TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.black,
+    return Scaffold(
+      body: RefreshIndicator(
+        onRefresh: _handleRefresh,
+        child: CustomScrollView(
+          slivers: [
+            SliverAppBar(
+              expandedHeight: 140.0,
+              flexibleSpace: FlexibleSpaceBar(
+                background: Container(
+                  decoration: const BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [Color(0xFF00A0E3), Color.fromARGB(255, 132, 220, 231)],
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                    ),
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.only(top: 40.0, left: 16.0, right: 16.0, bottom: 20.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    "Hi, $username",
+                                    style: const TextStyle(
+                                      fontSize: 28,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  const Text(
+                                    "Shared success is based on presence",
+                                    style: TextStyle(fontSize: 16, color: Colors.white70),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 16),
+                            GestureDetector(
+                              onTap: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(builder: (_) => const SettingsPage()),
+                                );
+                              },
+                              child: const ProfileAvatar(),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
                   ),
                 ),
-                const SizedBox(height: 4),
-                const Text(
-                  "Shared success is based on presence",
-                  style: TextStyle(fontSize: 14, color: Colors.black54),
-                ),
-              ],
+              ),
+              backgroundColor: Colors.white70,
+              iconTheme: const IconThemeData(color: Colors.white),
+              floating: true,
             ),
-          ),
-          GestureDetector(
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const SettingsPage()),
-              );
-            },
-            child: const ProfileAvatar(),
-          ),
-        ],
+            SliverList(
+              delegate: SliverChildListDelegate(
+                [
+                  _buildInfoCard(),
+                  _buildPresensiButton(),
+                  const SizedBox(height: 20),
+                  MapLocationWidget(key: _mapKey),
+                  const SizedBox(height: 20),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => const PermitPage()),
+          );
+        },
+        icon: const Icon(Icons.assignment),
+        label: const Text('Ajukan Izin'),
+      ),
+      backgroundColor: Colors.white70,
     );
   }
 
@@ -457,21 +449,21 @@ class _HomePageState extends State<HomePage> {
                       count: "${monthlySummary['hadir']} Hari",
                       color: const Color(
                         0xFF4CAF50,
-                      ), // Green from AttendanceHistoryPage
+                      ),
                     ),
                     StatusInfo(
                       label: "Terlambat",
                       count: "${monthlySummary['terlambat']} Hari",
                       color: const Color(
                         0xFFFF9800,
-                      ), // Orange from AttendanceHistoryPage
+                      ),
                     ),
                     StatusInfo(
                       label: "Tidak Hadir",
                       count: "${monthlySummary['tidakHadir']} Hari",
                       color: const Color(
                         0xFFF44336,
-                      ), // Red from AttendanceHistoryPage
+                      ),
                     ),
                   ],
                 ),
@@ -494,9 +486,8 @@ class _HomePageState extends State<HomePage> {
         padding: const EdgeInsets.symmetric(vertical: 16),
         onPressed: () {
           final isAllowed = _mapKey.currentState?.userIsWithinRadius() ?? false;
-
           if (isAllowed) {
-            _ambilFotoDanUpload(); // Aksi presensi
+            _ambilFotoDanUpload();
           } else {
             showCustomSnackBar(
               context,

@@ -65,16 +65,12 @@ class MapLocationWidgetState extends State<MapLocationWidget> {
     }
 
     try {
-      // 3. Dapatkan posisi pengguna saat ini
       Position position = await Geolocator.getCurrentPosition(
         desiredAccuracy: LocationAccuracy.high, // Akurasi tinggi untuk presensi
-        // Tambahkan timeout untuk mencegah loading yang terlalu lama
-        // timeLimit: Duration(seconds: 10),
       );
 
       LatLng currentLatLng = LatLng(position.latitude, position.longitude);
 
-      // 4. Hitung jarak dari pusat kantor
       double distance = _calculateDistance(
         currentLatLng.latitude,
         currentLatLng.longitude,
@@ -82,24 +78,20 @@ class MapLocationWidgetState extends State<MapLocationWidget> {
         centerLocation.longitude,
       );
 
-      // 5. Perbarui state berdasarkan posisi dan jarak
       setState(() {
         _currentPosition = currentLatLng; // Simpan posisi saat ini
         isWithinRadius = distance <= allowedRadiusInMeters; // Tentukan status radius
       });
 
-      // Tampilkan SnackBar berdasarkan status radius
       if (!isWithinRadius) {
         showCustomSnackBar(context, 'Kamu berada di luar area yang diizinkan (${distance.toStringAsFixed(1)} m).', isError: true);
       } else {
         showCustomSnackBar(context, 'Kamu berada di area presensi. (${distance.toStringAsFixed(1)} m).');
       }
       
-      return isWithinRadius; // Mengembalikan status final
+      return isWithinRadius;
     } catch (e) {
-      // Tangani error jika gagal mendapatkan posisi
       debugPrint('Error mendapatkan lokasi: $e');
-      // Menggunakan showCustomSnackBar
       showCustomSnackBar(context, 'Gagal mendapatkan lokasi: ${e.toString()}', isError: true);
       setState(() {
         _currentPosition = null; // Pastikan posisi diset null jika ada error
@@ -108,8 +100,7 @@ class MapLocationWidgetState extends State<MapLocationWidget> {
       return false; // Gagal karena error saat mendapatkan posisi
     }
   }
-
-  // Fungsi yang dipanggil dari luar (misal dari Home Page) untuk memperbarui lokasi
+  
   Future<void> refreshLocation() async {
     setState(() {
       _permissionFuture = _fetchLocationAndCheckRadius(); // Memulai ulang proses fetch lokasi
