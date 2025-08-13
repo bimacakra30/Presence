@@ -202,14 +202,9 @@ class _LoginPageState extends State<LoginPage> {
       // Simpan nama dan email ke SharedPreferences
       final userDoc = query.docs.first;
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('name', userDoc['name']);
-      await prefs.setString('email', userDoc['email']);
-
-      if (googleUser.photoUrl != null) {
-        await prefs.setString('profilePictureUrl', googleUser.photoUrl!);
-      } else {
-        await prefs.remove('profilePictureUrl');
-      }
+      await prefs.setString('name', userDoc['name'] ?? '');
+      await prefs.setString('email', userDoc['email'] ?? '');
+      await prefs.setString('profilePictureUrl', userDoc['profilePictureUrl'] ?? '');
 
       await Future.delayed(const Duration(seconds: 2));
 
