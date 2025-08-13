@@ -125,4 +125,45 @@ class FirestoreService
 
         return $users;
     }
+
+    public function getPerizinan($limit = 100, $lastDocument = null)
+{
+    $query = $this->db->collection('permits')->limit($limit);
+    
+    if ($lastDocument) {
+        $query = $query->startAfter($lastDocument);
+    }
+
+    $documents = $query->documents();
+    $absensi = [];
+    $lastDoc = null;
+
+    foreach ($documents as $document) {
+        if ($document->exists()) {
+            $data = $document->data();
+            $absensi[] = array_merge($data, [
+                'firestore_id' => $document->id(),
+            ]);
+            $lastDoc = $document; // Keep track of the last document for pagination
+        }
+    }
+
+    return [
+        'data' => $absensi,
+        'lastDocument' => $lastDoc,
+    ];
+}
+
+     public function deletePerizinan($documentId)
+    {
+        $collection = $this->db->collection('permits');
+        $collection->document($documentId)->delete();
+    }
+
+    public function updatePerizinan($id, $data)
+    {
+        $collection = $this->db->collection('permits');
+        $collection->document((string)$id)->set($data, ['merge' => true]);
+    }
+
 }

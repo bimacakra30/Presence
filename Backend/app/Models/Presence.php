@@ -4,9 +4,8 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
-use App\Helpers\CloudinaryHelper;
-use CloudinaryLabs\CloudinaryLaravel\Facades\Cloudinary;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Http;
 use Filament\Notifications\Notification;
 
 class Presence extends Model
@@ -54,8 +53,34 @@ class Presence extends Model
             ] as $type => $publicId) {
                 if ($publicId) {
                     try {
-                        Cloudinary::destroy($publicId);
-                        Log::info("Berhasil menghapus foto {$type} dari Cloudinary: {$publicId}");
+                        $cloudName = env('CLOUDINARY_CLOUD_NAME', 'dyf9r2al9');
+                        $apiKey = env('CLOUDINARY_API_KEY', '783185659825456');
+                        $apiSecret = env('CLOUDINARY_API_SECRET', 'MffoiYNXsoxv7Zlvo3GPFCYBLOE');
+
+                        // Log konfigurasi
+                        Log::info("Konfigurasi Cloudinary untuk {$type}: " . json_encode([
+                            'cloud_name' => $cloudName,
+                            'api_key' => $apiKey,
+                            'public_id' => $publicId,
+                        ]));
+
+                        // Buat signature untuk otentikasi
+                        $timestamp = time();
+                        $signature = sha1("public_id=$publicId&timestamp=$timestamp$apiSecret");
+
+                        // Kirim request ke API Cloudinary
+                        $response = Http::post("https://api.cloudinary.com/v1_1/$cloudName/image/destroy", [
+                            'public_id' => $publicId,
+                            'api_key' => $apiKey,
+                            'timestamp' => $timestamp,
+                            'signature' => $signature,
+                        ]);
+
+                        if ($response->successful()) {
+                            Log::info("Berhasil menghapus foto {$type} dari Cloudinary: {$publicId}");
+                        } else {
+                            throw new \Exception("Gagal menghapus foto dari Cloudinary: " . $response->body());
+                        }
                     } catch (\Exception $e) {
                         Log::error("Gagal menghapus foto {$type} dari Cloudinary: {$publicId}, Error: {$e->getMessage()}");
                         Notification::make()
@@ -64,6 +89,8 @@ class Presence extends Model
                             ->danger()
                             ->send();
                     }
+                } else {
+                    Log::warning("Public ID untuk {$type} tidak ditemukan, lewati penghapusan Cloudinary.");
                 }
             }
         });
