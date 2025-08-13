@@ -1,3 +1,4 @@
+// lib/pages/login_page.dart
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
@@ -9,7 +10,11 @@ import 'home.dart';
 import 'package:bcrypt/bcrypt.dart';
 
 class LoginPage extends StatefulWidget {
-  const LoginPage({super.key});
+  final String? notificationMessage; // <--- Tambahkan properti ini
+  const LoginPage({
+    super.key,
+    this.notificationMessage,
+  }); // <--- Perbarui konstruktor
 
   @override
   State<LoginPage> createState() => _LoginPageState();
@@ -23,6 +28,22 @@ class _LoginPageState extends State<LoginPage> {
 
   String? usernameError;
   String? passwordError;
+
+  @override
+  void initState() {
+    super.initState();
+    // Tampilkan notifikasi jika ada pesan
+    if (widget.notificationMessage != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(widget.notificationMessage!),
+            backgroundColor: Colors.green,
+          ),
+        );
+      });
+    }
+  }
 
   Future<void> login() async {
     final username = emailController.text.trim();
@@ -62,6 +83,8 @@ class _LoginPageState extends State<LoginPage> {
 
       final userDoc = query.docs.first;
       final hashedPassword = userDoc['password'];
+      final userEmailFromFirestore = userDoc['email'];
+
       final isMatch = BCrypt.checkpw(password, hashedPassword);
 
       if (!isMatch) {
@@ -73,10 +96,40 @@ class _LoginPageState extends State<LoginPage> {
         return;
       }
 
+      UserCredential userCredential;
+      try {
+        userCredential = await FirebaseAuth.instance.signInWithEmailAndPassword(
+          email: userEmailFromFirestore,
+          password: password,
+        );
+      } on FirebaseAuthException catch (e) {
+        if (!mounted) return;
+        Navigator.pop(context);
+        setState(() {
+          passwordError = "Gagal otentikasi Firebase: ${e.message}";
+          isLoading = false;
+        });
+        return;
+      }
+
+      final firebaseUser = userCredential.user;
+      if (firebaseUser == null) {
+        if (!mounted) Navigator.pop(context);
+        setState(() {
+          usernameError = "Gagal login Firebase Auth (pengguna null)";
+          isLoading = false;
+        });
+        return;
+      }
+
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('name', userDoc['name'] ?? '');
       await prefs.setString('email', userDoc['email'] ?? '');
       await prefs.setString('username', userDoc['username'] ?? '');
+      await prefs.setString(
+        'profilePictureUrl',
+        userDoc['profilePictureUrl'] ?? '',
+      );
 
       if (!userDoc.data().containsKey('uid') || userDoc['uid'] == null) {
         Navigator.pop(context);
@@ -152,12 +205,18 @@ class _LoginPageState extends State<LoginPage> {
       await prefs.setString('name', userDoc['name']);
       await prefs.setString('email', userDoc['email']);
 
+      if (googleUser.photoUrl != null) {
+        await prefs.setString('profilePictureUrl', googleUser.photoUrl!);
+      } else {
+        await prefs.remove('profilePictureUrl');
+      }
+
       await Future.delayed(const Duration(seconds: 2));
 
       Navigator.pushAndRemoveUntil(
         context,
         MaterialPageRoute(builder: (_) => const HomePage()),
-            (route) => false,
+        (route) => false,
       );
     } catch (e) {
       Navigator.pop(context);

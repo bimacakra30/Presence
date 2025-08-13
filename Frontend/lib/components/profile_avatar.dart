@@ -1,21 +1,46 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 
 class ProfileAvatar extends StatelessWidget {
-  const ProfileAvatar({super.key});
+  final String? profilePictureUrl;
+  final String? name;
+
+  const ProfileAvatar({
+    super.key,
+    this.profilePictureUrl,
+    this.name,
+  });
+
+  String _getInitials(String name) {
+    if (name.isEmpty) {
+      return 'U'; // Default initial
+    }
+    final nameParts = name.trim().split(' ');
+    if (nameParts.length > 1) {
+      return (nameParts[0][0] + nameParts[1][0]).toUpperCase();
+    }
+    return nameParts[0][0].toUpperCase();
+  }
 
   @override
   Widget build(BuildContext context) {
-    User? user = FirebaseAuth.instance.currentUser ;
+    // Tentukan inisial dari nama jika nama tidak null atau kosong
+    final String initials = (name != null && name!.isNotEmpty) ? _getInitials(name!) : 'U';
 
     return CircleAvatar(
       radius: 26,
-      backgroundColor: Colors.white,
-      backgroundImage: user?.photoURL != null
-          ? NetworkImage(user!.photoURL!)
+      backgroundColor: Colors.blueGrey,
+      backgroundImage: (profilePictureUrl != null && profilePictureUrl!.isNotEmpty)
+          ? NetworkImage(profilePictureUrl!)
           : null,
-      child: user?.photoURL == null
-          ? const Icon(Icons.person, size: 30, color: Color.fromARGB(255, 30, 30, 30))
+      child: (profilePictureUrl == null || profilePictureUrl!.isEmpty)
+          ? Text(
+              initials,
+              style: const TextStyle(
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+              ),
+            )
           : null,
     );
   }

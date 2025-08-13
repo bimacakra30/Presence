@@ -1,3 +1,4 @@
+import 'package:Presence/pages/edit_profile_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -5,6 +6,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'login_page.dart';
 import 'history.dart';
 import 'permit_history_page.dart';
+import 'change_password_page.dart';
+import 'package:Presence/components/profile_avatar.dart';
 
 class SettingsPage extends StatefulWidget {
   const SettingsPage({super.key});
@@ -20,6 +23,7 @@ class _SettingsPageState extends State<SettingsPage>
   late Animation<Offset> _slideAnimation;
 
   String _username = 'User';
+  String _profilePictureUrl = '';
   String _email = '';
   bool _pushNotifications = true;
   bool _appNotifications = true;
@@ -52,11 +56,12 @@ class _SettingsPageState extends State<SettingsPage>
 
   Future<void> _loadUserData() async {
     final prefs = await SharedPreferences.getInstance();
-    final user = FirebaseAuth.instance.currentUser;
+    if (!mounted) return; // Tambahkan pengecekan ini
 
     setState(() {
+      _profilePictureUrl = prefs.getString('profilePictureUrl') ?? '';
       _username = prefs.getString('name') ?? 'User';
-      _email = user?.email ?? '';
+      _email = prefs.getString('email') ?? '';
       _pushNotifications = prefs.getBool('push_notifications') ?? true;
       _appNotifications = prefs.getBool('app_notifications') ?? true;
     });
@@ -111,8 +116,8 @@ class _SettingsPageState extends State<SettingsPage>
           decoration: const BoxDecoration(
             gradient: LinearGradient(
               colors: [Color(0xFF00A0E3), Color.fromARGB(255, 132, 220, 231)],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
             ),
           ),
           child: const SafeArea(
@@ -171,77 +176,63 @@ class _SettingsPageState extends State<SettingsPage>
   }
 
   Widget _buildProfileSection() {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      padding: const EdgeInsets.all(20),
-      child: Row(
-        children: [
-          Container(
-            width: 60,
-            height: 60,
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [Color(0xFF00A0E3), Color(0xFF0288D1)],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              borderRadius: BorderRadius.circular(30),
+    return InkWell(
+      onTap: () {
+        // Perbaikan: Memanggil _loadUserData() setelah kembali dari EditProfilePage
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (context) => const EditProfilePage()),
+        ).then((value) {
+          _loadUserData();
+        });
+      },
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 10,
+              offset: const Offset(0, 2),
             ),
-            child: Center(
-              child: Text(
-                _username.isNotEmpty ? _username[0].toUpperCase() : 'U',
-                style: const TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
-                ),
-              ),
+          ],
+        ),
+        padding: const EdgeInsets.all(20),
+        child: Row(
+          children: [
+            ProfileAvatar(
+              profilePictureUrl: _profilePictureUrl,
+              name: _username,
             ),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  _username,
-                  style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.black87,
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    _username,
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.black87,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  _email.isNotEmpty ? _email : 'Email tidak tersedia',
-                  style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
-                ),
-              ],
+                  const SizedBox(height: 4),
+                  Text(
+                    _email.isNotEmpty ? _email : 'Email tidak tersedia',
+                    style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
             ),
-          ),
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: Colors.green.shade50,
-              borderRadius: BorderRadius.circular(8),
+            const Icon(
+              Icons.chevron_right,
+              color: Colors.grey,
             ),
-            child: Icon(
-              Icons.verified_user,
-              color: Colors.green.shade600,
-              size: 20,
-            ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -285,7 +276,15 @@ class _SettingsPageState extends State<SettingsPage>
           subtitle: 'Ubah informasi pribadi',
           onTap: () {
             HapticFeedback.lightImpact();
-            _showComingSoonDialog('Edit Profil');
+            // Perbaikan: Memanggil _loadUserData() setelah kembali dari EditProfilePage
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => const EditProfilePage(),
+              ),
+            ).then((value) {
+              _loadUserData();
+            });
           },
         ),
         _buildMenuItem(
@@ -294,13 +293,18 @@ class _SettingsPageState extends State<SettingsPage>
           subtitle: 'Perbarui kata sandi akun',
           onTap: () {
             HapticFeedback.lightImpact();
-            _showComingSoonDialog('Ubah Kata Sandi');
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => const ChangePasswordPage(),
+              ),
+            );
           },
         ),
       ],
     );
   }
-
+  // ... (bagian kode lainnya tetap sama)
   Widget _buildNotificationSection() {
     return _buildSection(
       title: 'Notifikasi',
@@ -550,19 +554,19 @@ class _SettingsPageState extends State<SettingsPage>
   }
 
   Widget _buildLogoutButton() {
-    return Container(
+    return SizedBox(
       width: double.infinity,
       height: 56,
       child: ElevatedButton.icon(
         onPressed: () => _showLogoutDialog(),
         style: ElevatedButton.styleFrom(
-          backgroundColor: Colors.red.shade500,
+          backgroundColor: const Color.fromARGB(255, 94, 94, 94),
           foregroundColor: Colors.white,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
           ),
           elevation: 2,
-          shadowColor: Colors.red.shade500.withOpacity(0.3),
+          shadowColor: const Color.fromARGB(255, 110, 110, 110),
         ),
         icon: const Icon(Icons.logout, size: 20),
         label: const Text(
@@ -614,7 +618,6 @@ class _SettingsPageState extends State<SettingsPage>
 
   Future<void> _performLogout() async {
     try {
-      // Show loading indicator
       showDialog(
         context: context,
         barrierDismissible: false,
@@ -636,6 +639,8 @@ class _SettingsPageState extends State<SettingsPage>
       );
 
       await FirebaseAuth.instance.signOut();
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.clear();
 
       if (mounted) {
         Navigator.pushAndRemoveUntil(
@@ -646,7 +651,7 @@ class _SettingsPageState extends State<SettingsPage>
       }
     } catch (e) {
       if (mounted) {
-        Navigator.pop(context); // Close loading dialog
+        Navigator.pop(context); // Tutup dialog loading
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Gagal logout: ${e.toString()}'),
@@ -695,7 +700,7 @@ class _SettingsPageState extends State<SettingsPage>
   void _showAboutDialog() {
     showAboutDialog(
       context: context,
-      applicationName: 'HR Management App',
+      applicationName: 'Presence App',
       applicationVersion: '1.0.0',
       applicationIcon: Container(
         width: 60,
@@ -710,10 +715,10 @@ class _SettingsPageState extends State<SettingsPage>
       ),
       children: [
         const Text(
-          'Aplikasi manajemen HR untuk kehadiran dan perizinan karyawan.',
+          'Aplikasi untuk kehadiran dan perizinan karyawan.',
         ),
         const SizedBox(height: 16),
-        const Text('Dikembangkan dengan Flutter & Firebase.'),
+        const Text('Dikembangkan Tim Magang Politeknik Negeri Madiun.'),
       ],
     );
   }

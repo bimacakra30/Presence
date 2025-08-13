@@ -351,12 +351,12 @@ class _PermitHistoryPageState extends State<PermitHistoryPage>
                       children: [
                         // Header Row
                         Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Container(
                               padding: const EdgeInsets.all(10),
                               decoration: BoxDecoration(
-                                color: typeInfo['color']
-                                    .withValues(alpha: 0.1 * 255), // Perbaikan: Menghapus .round()
+                                color: typeInfo['color'].withOpacity(0.1),
                                 borderRadius: BorderRadius.circular(10),
                               ),
                               child: Icon(
@@ -370,55 +370,70 @@ class _PermitHistoryPageState extends State<PermitHistoryPage>
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Text(
-                                    typeInfo['label'],
-                                    style: const TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.w600,
-                                      color: Colors.black87,
-                                    ),
+                                  Row(
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Expanded(
+                                        child: Text(
+                                          typeInfo['label'],
+                                          style: const TextStyle(
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.w600,
+                                            color: Colors.black87,
+                                          ),
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 12,
+                                          vertical: 6,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: statusInfo['backgroundColor'],
+                                          borderRadius: BorderRadius.circular(
+                                            20,
+                                          ),
+                                          border: Border.all(
+                                            color: statusInfo['color']
+                                                .withOpacity(0.3),
+                                          ),
+                                        ),
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Icon(
+                                              statusInfo['icon'],
+                                              color: statusInfo['color'],
+                                              size: 14,
+                                            ),
+                                            const SizedBox(width: 4),
+                                            Text(
+                                              statusInfo['label'],
+                                              style: TextStyle(
+                                                color: statusInfo['color'],
+                                                fontSize: 12,
+                                                fontWeight: FontWeight.w600,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                   if (formattedSubmissionDate.isNotEmpty)
-                                    Text(
-                                      'Diajukan $formattedSubmissionDate',
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        color: Colors.grey.shade600,
+                                    Padding(
+                                      padding: const EdgeInsets.only(top: 4.0),
+                                      child: Text(
+                                        'Diajukan $formattedSubmissionDate',
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          color: Colors.grey.shade600,
+                                        ),
                                       ),
                                     ),
-                                ],
-                              ),
-                            ),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 12,
-                                vertical: 6,
-                              ),
-                              decoration: BoxDecoration(
-                                color: statusInfo['backgroundColor'],
-                                borderRadius: BorderRadius.circular(20),
-                                border: Border.all(
-                                  color: statusInfo['color']
-                                      .withValues(alpha: 0.3 * 255), // Perbaikan: Menghapus .round()
-                                ),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(
-                                    statusInfo['icon'],
-                                    color: statusInfo['color'],
-                                    size: 14,
-                                  ),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    statusInfo['label'],
-                                    style: TextStyle(
-                                      color: statusInfo['color'],
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
                                 ],
                               ),
                             ),
@@ -525,13 +540,16 @@ class _PermitHistoryPageState extends State<PermitHistoryPage>
       context: context,
       builder: (BuildContext context) {
         return Dialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               ClipRRect(
-                borderRadius:
-                    const BorderRadius.vertical(top: Radius.circular(16)),
+                borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(16),
+                ),
                 child: Image.network(
                   imageUrl,
                   fit: BoxFit.cover,
@@ -615,8 +633,9 @@ class _PermitHistoryPageState extends State<PermitHistoryPage>
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: typeInfo['color']
-                          .withValues(alpha: 0.1 * 255), // Perbaikan: Menghapus .round()
+                      color: typeInfo['color'].withValues(
+                        alpha: 0.1 * 255,
+                      ), // Perbaikan: Menghapus .round()
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Icon(
@@ -708,8 +727,7 @@ class _PermitHistoryPageState extends State<PermitHistoryPage>
                       value: 'Gambar tersedia',
                       trailing: TextButton(
                         onPressed: () {
-                          _showImageDialog(
-                              context, permit['proofImageUrl']!);
+                          _showImageDialog(context, permit['proofImageUrl']!);
                         },
                         child: const Text(
                           'Lihat',
@@ -823,13 +841,13 @@ class _PermitHistoryPageState extends State<PermitHistoryPage>
                       Color(0xFF00A0E3),
                       Color.fromARGB(255, 132, 220, 231),
                     ],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
                   ),
                 ),
                 child: const SafeArea(
                   child: Padding(
-                    padding: EdgeInsets.only(bottom: 12.0, left: 45.0),
+                    padding: EdgeInsets.only(bottom: 12.0, right: 40.0),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.center,
                       mainAxisAlignment: MainAxisAlignment.end,
