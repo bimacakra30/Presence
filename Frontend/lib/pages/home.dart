@@ -25,6 +25,7 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   String username = "Pengguna";
+  String _profilePictureUrl = "";
   DateTime? clockInTime;
   DateTime? clockOutTime;
   bool? lateStatus;
@@ -40,13 +41,13 @@ class _HomePageState extends State<HomePage> {
   void initState() {
     super.initState();
     fetchUsername();
+    _loadProfileData();
     fetchPresensiHariIni();
     fetchMonthlyAttendanceSummary();
   }
 
   Future<void> fetchUsername() async {
     final prefs = await SharedPreferences.getInstance();
-    if (!mounted) return;
     final savedName = prefs.getString('name');
     if (savedName != null && savedName.isNotEmpty) {
       setState(() {
@@ -55,10 +56,19 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
+  Future<void> _loadProfileData() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (mounted) {
+      setState(() {
+        username = prefs.getString('name') ?? 'Pengguna';
+        _profilePictureUrl = prefs.getString('profilePictureUrl') ?? '';
+      });
+    }
+  }
+
   Future<void> fetchPresensiHariIni() async {
     try {
       final data = await fetchPresensiHariIniUtil();
-      if (!mounted) return;
       if (data != null) {
         setState(() {
           if (data['clockIn'] != null) {
@@ -73,7 +83,6 @@ class _HomePageState extends State<HomePage> {
         });
       }
     } catch (e) {
-      if (!mounted) return;
       debugPrint('Error fetching presensi: $e');
       showCustomSnackBar(
         context,
@@ -84,19 +93,15 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<void> fetchMonthlyAttendanceSummary() async {
-    if (!mounted) return;
     setState(() {
       isLoadingSummary = true;
     });
-
     try {
       final summary = await fetchMonthlyAttendance();
-      if (!mounted) return;
       setState(() {
         monthlySummary = summary;
       });
     } catch (e) {
-      if (!mounted) return;
       debugPrint('Error fetching monthly attendance: $e');
       showCustomSnackBar(
         context,
@@ -104,11 +109,9 @@ class _HomePageState extends State<HomePage> {
         isError: true,
       );
     } finally {
-      if (mounted) {
-        setState(() {
-          isLoadingSummary = false;
-        });
-      }
+      setState(() {
+        isLoadingSummary = false;
+      });
     }
   }
 
@@ -120,7 +123,6 @@ class _HomePageState extends State<HomePage> {
       fetchMonthlyAttendanceSummary(),
       _mapKey.currentState?.refreshLocation() ?? Future.value(),
     ]);
-    if (!mounted) return;
     showCustomSnackBar(context, 'Data berhasil diperbarui');
   }
 
@@ -128,22 +130,19 @@ class _HomePageState extends State<HomePage> {
     final now = DateTime.now();
     final isSunday = now.weekday == DateTime.sunday;
     final isNationalHoliday = parsedHolidays.any(
-          (holiday) => isSameDay(holiday, now),
+      (holiday) => isSameDay(holiday, now),
     );
 
     if (isSunday || isNationalHoliday) {
       String message = 'Presensi tidak tersedia hari ini karena ';
-      final List<String> reasons = [];
-      if (isSunday) {
-        reasons.add('Hari Minggu');
-      }
+      List<String> reasons = [];
+      if (isSunday) reasons.add('Hari Minggu');
       if (isNationalHoliday) {
         final holidayDescription = getHolidayDescription(now);
-        if (holidayDescription != null) {
+        if (holidayDescription != null)
           reasons.add(holidayDescription);
-        } else {
+        else
           reasons.add('hari libur');
-        }
       }
       message += reasons.join(' dan ');
       showCustomSnackBar(context, message, isError: true);
@@ -152,28 +151,30 @@ class _HomePageState extends State<HomePage> {
 
     final picker = ImagePicker();
     try {
-      final XFile? photo = await picker.pickImage(source: ImageSource.camera, preferredCameraDevice: CameraDevice.front);
-      if (!mounted) return;
+      final XFile? photo = await picker.pickImage(source: ImageSource.camera);
       if (photo == null) {
         showCustomSnackBar(context, 'Pengambilan foto dibatalkan');
         return;
       }
       showCustomSnackBar(context, 'Mengupload foto.....');
-
       final file = File(photo.path);
-      final uploadResult = await CloudinaryService.uploadImageToCloudinary(file);
-      if (!mounted) return;
+      final uploadResult = await CloudinaryService.uploadImageToCloudinary(
+        file,
+      );
       if (uploadResult == null || uploadResult['url'] == null) {
         showCustomSnackBar(context, 'Gagal upload Foto', isError: true);
         return;
       }
 
       final prefs = await SharedPreferences.getInstance();
-      if (!mounted) return;
       final uid =
           FirebaseAuth.instance.currentUser?.uid ?? prefs.getString('uid');
       if (uid == null) {
-        showCustomSnackBar(context, 'User tidak ditemukan, silakan login ulang', isError: true);
+        showCustomSnackBar(
+          context,
+          'User tidak ditemukan, silakan login ulang',
+          isError: true,
+        );
         return;
       }
 
@@ -185,7 +186,6 @@ class _HomePageState extends State<HomePage> {
           .limit(1)
           .get();
 
-      if (!mounted) return;
       await _handleAttendance(
         uid: uid,
         username: username,
@@ -198,9 +198,12 @@ class _HomePageState extends State<HomePage> {
       await fetchPresensiHariIni();
       await fetchMonthlyAttendanceSummary();
     } catch (e) {
-      if (!mounted) return;
       debugPrint('Error saat proses foto dan upload: $e');
-      showCustomSnackBar(context, 'Terjadi kesalahan saat presensi: $e', isError: true);
+      showCustomSnackBar(
+        context,
+        'Terjadi kesalahan saat presensi: $e',
+        isError: true,
+      );
     }
   }
 
@@ -219,7 +222,12 @@ class _HomePageState extends State<HomePage> {
       final presenceRef = FirebaseFirestore.instance.collection('presence');
 
       if (existingQuery.docs.isEmpty) {
-        final workStartTime = DateTime(now.year, now.month, now.day, workStartHour);
+        final workStartTime = DateTime(
+          now.year,
+          now.month,
+          now.day,
+          workStartHour,
+        );
         final isLate = now.isAfter(workStartTime);
         String? lateDuration;
         if (isLate) {
@@ -239,8 +247,6 @@ class _HomePageState extends State<HomePage> {
           'late': isLate,
           if (lateDuration != null) 'lateDuration': lateDuration,
         });
-
-        if (!mounted) return;
         setState(() {
           clockInTime = now;
           lateStatus = isLate;
@@ -253,14 +259,20 @@ class _HomePageState extends State<HomePage> {
         final canClockOut = now.hour >= workEndHour;
 
         if (hasClockedOut) {
-          if (!mounted) return;
-          showCustomSnackBar(context, 'Anda sudah Clock Out hari ini', isError: true);
+          showCustomSnackBar(
+            context,
+            'Anda sudah Clock Out hari ini',
+            isError: true,
+          );
           return;
         }
 
         if (!canClockOut) {
-          if (!mounted) return;
-          showCustomSnackBar(context, 'Clock Out hanya tersedia setelah jam 17:00', isError: true);
+          showCustomSnackBar(
+            context,
+            'Clock Out hanya tersedia setelah jam 17:00',
+            isError: true,
+          );
           return;
         }
 
@@ -269,23 +281,23 @@ class _HomePageState extends State<HomePage> {
           'fotoClockOut': imageUrl,
           'fotoClockOutPublicId': publicId,
         });
-
-        if (!mounted) return;
         showCustomSnackBar(context, 'Berhasil Clock Out');
       }
     } catch (e) {
-      if (!mounted) return;
-      showCustomSnackBar(context, 'Terjadi kesalahan saat presensi: $e', isError: true);
+      showCustomSnackBar(
+        context,
+        'Terjadi kesalahan saat presensi: $e',
+        isError: true,
+      );
       rethrow;
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    // Mengatur warna ikon status bar agar terlihat jelas
     SystemChrome.setSystemUIOverlayStyle(
-      const SystemUiOverlayStyle(
-        statusBarIconBrightness: Brightness.light,
-      ),
+      const SystemUiOverlayStyle(statusBarIconBrightness: Brightness.light),
     );
 
     return Scaffold(
@@ -294,18 +306,24 @@ class _HomePageState extends State<HomePage> {
         child: CustomScrollView(
           slivers: [
             SliverAppBar(
-              expandedHeight: 140.0,
+              expandedHeight: 150.0,
               flexibleSpace: FlexibleSpaceBar(
                 background: Container(
                   decoration: const BoxDecoration(
                     gradient: LinearGradient(
-                      colors: [Color(0xFF00A0E3), Color.fromARGB(255, 132, 220, 231)],
+                      colors: [
+                        Color(0xFF00A0E3),
+                        Color.fromARGB(255, 132, 220, 231),
+                      ],
                       begin: Alignment.topCenter,
                       end: Alignment.bottomCenter,
                     ),
                   ),
                   child: Padding(
-                    padding: const EdgeInsets.only(top: 40.0, left: 16.0, right: 16.0, bottom: 20.0),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 20,
+                      vertical: 10,
+                    ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       mainAxisAlignment: MainAxisAlignment.end,
@@ -328,7 +346,10 @@ class _HomePageState extends State<HomePage> {
                                   const SizedBox(height: 4),
                                   const Text(
                                     "Shared success is based on presence",
-                                    style: TextStyle(fontSize: 16, color: Colors.white70),
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      color: Colors.white70,
+                                    ),
                                   ),
                                 ],
                               ),
@@ -338,10 +359,18 @@ class _HomePageState extends State<HomePage> {
                               onTap: () {
                                 Navigator.push(
                                   context,
-                                  MaterialPageRoute(builder: (_) => const SettingsPage()),
-                                );
+                                  MaterialPageRoute(
+                                    builder: (_) => const SettingsPage(),
+                                  ),
+                                ).then((_) {
+                                  // Panggil fungsi refresh saat kembali dari SettingsPage
+                                  _loadProfileData();
+                                });
                               },
-                              child: const ProfileAvatar(),
+                              child: ProfileAvatar(
+                                profilePictureUrl: _profilePictureUrl,
+                                name: username,
+                              ),
                             ),
                           ],
                         ),
@@ -355,15 +384,13 @@ class _HomePageState extends State<HomePage> {
               floating: true,
             ),
             SliverList(
-              delegate: SliverChildListDelegate(
-                [
-                  _buildInfoCard(),
-                  _buildPresensiButton(),
-                  const SizedBox(height: 20),
-                  MapLocationWidget(key: _mapKey),
-                  const SizedBox(height: 20),
-                ],
-              ),
+              delegate: SliverChildListDelegate([
+                _buildInfoCard(),
+                _buildPresensiButton(),
+                const SizedBox(height: 20),
+                MapLocationWidget(key: _mapKey),
+                const SizedBox(height: 20),
+              ]),
             ),
           ],
         ),
@@ -467,25 +494,25 @@ class _HomePageState extends State<HomePage> {
           isLoadingSummary
               ? const Center(child: CircularProgressIndicator())
               : Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            children: [
-              StatusInfo(
-                label: "Hadir",
-                count: "${monthlySummary['hadir']} Hari",
-                color: const Color(0xFF4CAF50),
-              ),
-              StatusInfo(
-                label: "Terlambat",
-                count: "${monthlySummary['terlambat']} Hari",
-                color: const Color(0xFFFF9800),
-              ),
-              StatusInfo(
-                label: "Tidak Hadir",
-                count: "${monthlySummary['tidakHadir']} Hari",
-                color: const Color(0xFFF44336),
-              ),
-            ],
-          ),
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: [
+                    StatusInfo(
+                      label: "Hadir",
+                      count: "${monthlySummary['hadir']} Hari",
+                      color: const Color(0xFF4CAF50),
+                    ),
+                    StatusInfo(
+                      label: "Terlambat",
+                      count: "${monthlySummary['terlambat']} Hari",
+                      color: const Color(0xFFFF9800),
+                    ),
+                    StatusInfo(
+                      label: "Tidak Hadir",
+                      count: "${monthlySummary['tidakHadir']} Hari",
+                      color: const Color(0xFFF44336),
+                    ),
+                  ],
+                ),
         ],
       ),
     );
