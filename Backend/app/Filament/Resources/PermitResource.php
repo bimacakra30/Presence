@@ -5,13 +5,17 @@ namespace App\Filament\Resources;
 use App\Filament\Resources\PermitResource\Pages;
 use App\Filament\Resources\PermitResource\RelationManagers;
 use App\Models\Permit;
+use App\Services\FirestoreService;
 use Filament\Forms;
 use Filament\Forms\Form;
+use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
+use Illuminate\Support\Facades\Log;
+
 
 class PermitResource extends Resource
 {
@@ -42,12 +46,6 @@ class PermitResource extends Resource
                     ->maxLength(255),
                 Forms\Components\TextInput::make('status')
                     ->required(),
-                Forms\Components\TextInput::make('uid')
-                    ->maxLength(255),
-                Forms\Components\TextInput::make('firestore_id')
-                    ->maxLength(255),
-                Forms\Components\TextInput::make('public_id_bukti_izin')
-                    ->maxLength(255),
             ]);
     }
 
@@ -67,14 +65,18 @@ class PermitResource extends Resource
                     ->sortable(),
                 Tables\Columns\TextColumn::make('deskripsi')
                     ->searchable(),
-                Tables\Columns\TextColumn::make('bukti_izin')
+                Tables\Columns\ImageColumn::make('bukti_izin')
+                    ->label('Bukti Perizinan')
+                    ->height(200)
                     ->searchable(),
-                Tables\Columns\TextColumn::make('status'),
-                Tables\Columns\TextColumn::make('uid')
-                    ->searchable(),
-                Tables\Columns\TextColumn::make('firestore_id')
-                    ->searchable(),
-                Tables\Columns\TextColumn::make('public_id_bukti_izin')
+                Tables\Columns\TextColumn::make('status')
+                    ->badge()
+                    ->colors([
+                        'success' => 'approved',
+                        'danger' => 'rejected',
+                        'warning' => 'pending'
+                    ])
+                    ->formatStateUsing(fn (string $state) => ucfirst($state))
                     ->searchable(),
                 Tables\Columns\TextColumn::make('created_at')
                     ->dateTime()
@@ -89,11 +91,74 @@ class PermitResource extends Resource
                 //
             ])
             ->actions([
-                Tables\Actions\EditAction::make(),
+                Tables\Actions\Action::make('terima')
+                    ->label('Terima')
+                    ->icon('heroicon-o-check-circle')
+                    ->color('success')
+                    ->visible(fn (Permit $record) => $record->status === 'pending') // Hanya muncul jika status pending
+                    ->requiresConfirmation()
+                    ->modalHeading('Terima Perizinan')
+                    ->modalSubheading('Apakah Anda yakin ingin menerima perizinan ini?')
+                    ->modalButton('Ya, Terima')
+                    ->action(function (Permit $record) {
+                        try {
+                            $record->update(['status' => 'approved']);
+                            Notification::make()
+                                ->title('Perizinan berhasil diterima.')
+                                ->success()
+                                ->send();
+
+                            // Opsional: Sinkronkan ke Firestore
+                            $service = new FirestoreService();
+                            $service->updatePerizinan($record->firestore_id, ['status' => 'approved']);
+                        } catch (\Exception $e) {
+                            Log::error("Gagal menerima perizinan ID: {$record->id}, Error: {$e->getMessage()}");
+                            Notification::make()
+                                ->title('Gagal Menerima Perizinan')
+                                ->body("Terjadi kesalahan: {$e->getMessage()}")
+                                ->danger()
+                                ->send();
+                        }
+                    }),
+                    Tables\Actions\Action::make('tolak')
+                        ->label('Tolak')
+                        ->icon('heroicon-o-x-circle')
+                        ->color('danger')
+                        ->visible(fn (Permit $record) => $record->status === 'pending') // Hanya muncul jika status pending
+                        ->requiresConfirmation()
+                        ->modalHeading('Tolak Perizinan')
+                        ->modalSubheading('Apakah Anda yakin ingin menolak perizinan ini?')
+                        ->modalButton('Ya, Tolak')
+                        ->action(function (Permit $record) {
+                            try {
+                                $record->update(['status' => 'rejected']);
+                                Notification::make()
+                                    ->title('Perizinan berhasil ditolak.')
+                                    ->success()
+                                    ->send();
+
+                                // Opsional: Sinkronkan ke Firestore
+                                $service = new FirestoreService();
+                                $service->updatePerizinan($record->firestore_id, ['status' => 'rejected']);
+                            } catch (\Exception $e) {
+                                Log::error("Gagal menolak perizinan ID: {$record->id}, Error: {$e->getMessage()}");
+                                Notification::make()
+                                    ->title('Gagal Menolak Perizinan')
+                                    ->body("Terjadi kesalahan: {$e->getMessage()}")
+                                    ->danger()
+                                    ->send();
+                            }
+                        }),
             ])
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
-                    Tables\Actions\DeleteBulkAction::make(),
+                    Tables\Actions\DeleteBulkAction::make()
+                        ->label('Delete')
+                        ->requiresConfirmation()
+                        ->modalHeading('Confirm Deletion')
+                        ->modalDescription('This will permanently delete selected presence records, associated photos in Cloudinary, and related data in Firestore. Are you sure?')
+                        ->action(fn ($records) => $records->each->delete())
+                        ->successNotificationMessage('Presences and associated photos deleted successfully.'),
                 ]),
             ]);
     }
@@ -110,7 +175,6 @@ class PermitResource extends Resource
         return [
             'index' => Pages\ListPermits::route('/'),
             'create' => Pages\CreatePermit::route('/create'),
-            'edit' => Pages\EditPermit::route('/{record}/edit'),
         ];
     }
 
