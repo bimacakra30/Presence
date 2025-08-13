@@ -1,5 +1,3 @@
-// lib/pages/home_page.dart
-
 import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
@@ -48,6 +46,7 @@ class _HomePageState extends State<HomePage> {
 
   Future<void> fetchUsername() async {
     final prefs = await SharedPreferences.getInstance();
+    if (!mounted) return;
     final savedName = prefs.getString('name');
     if (savedName != null && savedName.isNotEmpty) {
       setState(() {
@@ -59,6 +58,7 @@ class _HomePageState extends State<HomePage> {
   Future<void> fetchPresensiHariIni() async {
     try {
       final data = await fetchPresensiHariIniUtil();
+      if (!mounted) return;
       if (data != null) {
         setState(() {
           if (data['clockIn'] != null) {
@@ -73,6 +73,7 @@ class _HomePageState extends State<HomePage> {
         });
       }
     } catch (e) {
+      if (!mounted) return;
       debugPrint('Error fetching presensi: $e');
       showCustomSnackBar(
         context,
@@ -83,15 +84,19 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<void> fetchMonthlyAttendanceSummary() async {
+    if (!mounted) return;
     setState(() {
       isLoadingSummary = true;
     });
+
     try {
       final summary = await fetchMonthlyAttendance();
+      if (!mounted) return;
       setState(() {
         monthlySummary = summary;
       });
     } catch (e) {
+      if (!mounted) return;
       debugPrint('Error fetching monthly attendance: $e');
       showCustomSnackBar(
         context,
@@ -99,9 +104,11 @@ class _HomePageState extends State<HomePage> {
         isError: true,
       );
     } finally {
-      setState(() {
-        isLoadingSummary = false;
-      });
+      if (mounted) {
+        setState(() {
+          isLoadingSummary = false;
+        });
+      }
     }
   }
 
@@ -113,6 +120,7 @@ class _HomePageState extends State<HomePage> {
       fetchMonthlyAttendanceSummary(),
       _mapKey.currentState?.refreshLocation() ?? Future.value(),
     ]);
+    if (!mounted) return;
     showCustomSnackBar(context, 'Data berhasil diperbarui');
   }
 
@@ -120,17 +128,22 @@ class _HomePageState extends State<HomePage> {
     final now = DateTime.now();
     final isSunday = now.weekday == DateTime.sunday;
     final isNationalHoliday = parsedHolidays.any(
-      (holiday) => isSameDay(holiday, now),
+          (holiday) => isSameDay(holiday, now),
     );
 
     if (isSunday || isNationalHoliday) {
       String message = 'Presensi tidak tersedia hari ini karena ';
-      List<String> reasons = [];
-      if (isSunday) reasons.add('Hari Minggu');
+      final List<String> reasons = [];
+      if (isSunday) {
+        reasons.add('Hari Minggu');
+      }
       if (isNationalHoliday) {
         final holidayDescription = getHolidayDescription(now);
-        if (holidayDescription != null) reasons.add(holidayDescription);
-        else reasons.add('hari libur');
+        if (holidayDescription != null) {
+          reasons.add(holidayDescription);
+        } else {
+          reasons.add('hari libur');
+        }
       }
       message += reasons.join(' dan ');
       showCustomSnackBar(context, message, isError: true);
@@ -139,20 +152,24 @@ class _HomePageState extends State<HomePage> {
 
     final picker = ImagePicker();
     try {
-      final XFile? photo = await picker.pickImage(source: ImageSource.camera);
+      final XFile? photo = await picker.pickImage(source: ImageSource.camera, preferredCameraDevice: CameraDevice.front);
+      if (!mounted) return;
       if (photo == null) {
         showCustomSnackBar(context, 'Pengambilan foto dibatalkan');
         return;
       }
       showCustomSnackBar(context, 'Mengupload foto.....');
+
       final file = File(photo.path);
       final uploadResult = await CloudinaryService.uploadImageToCloudinary(file);
+      if (!mounted) return;
       if (uploadResult == null || uploadResult['url'] == null) {
         showCustomSnackBar(context, 'Gagal upload Foto', isError: true);
         return;
       }
 
       final prefs = await SharedPreferences.getInstance();
+      if (!mounted) return;
       final uid =
           FirebaseAuth.instance.currentUser?.uid ?? prefs.getString('uid');
       if (uid == null) {
@@ -168,6 +185,7 @@ class _HomePageState extends State<HomePage> {
           .limit(1)
           .get();
 
+      if (!mounted) return;
       await _handleAttendance(
         uid: uid,
         username: username,
@@ -180,6 +198,7 @@ class _HomePageState extends State<HomePage> {
       await fetchPresensiHariIni();
       await fetchMonthlyAttendanceSummary();
     } catch (e) {
+      if (!mounted) return;
       debugPrint('Error saat proses foto dan upload: $e');
       showCustomSnackBar(context, 'Terjadi kesalahan saat presensi: $e', isError: true);
     }
@@ -220,6 +239,8 @@ class _HomePageState extends State<HomePage> {
           'late': isLate,
           if (lateDuration != null) 'lateDuration': lateDuration,
         });
+
+        if (!mounted) return;
         setState(() {
           clockInTime = now;
           lateStatus = isLate;
@@ -232,11 +253,13 @@ class _HomePageState extends State<HomePage> {
         final canClockOut = now.hour >= workEndHour;
 
         if (hasClockedOut) {
+          if (!mounted) return;
           showCustomSnackBar(context, 'Anda sudah Clock Out hari ini', isError: true);
           return;
         }
 
         if (!canClockOut) {
+          if (!mounted) return;
           showCustomSnackBar(context, 'Clock Out hanya tersedia setelah jam 17:00', isError: true);
           return;
         }
@@ -246,9 +269,12 @@ class _HomePageState extends State<HomePage> {
           'fotoClockOut': imageUrl,
           'fotoClockOutPublicId': publicId,
         });
+
+        if (!mounted) return;
         showCustomSnackBar(context, 'Berhasil Clock Out');
       }
     } catch (e) {
+      if (!mounted) return;
       showCustomSnackBar(context, 'Terjadi kesalahan saat presensi: $e', isError: true);
       rethrow;
     }
@@ -256,7 +282,6 @@ class _HomePageState extends State<HomePage> {
 
   @override
   Widget build(BuildContext context) {
-    // Mengatur warna ikon status bar agar terlihat jelas
     SystemChrome.setSystemUIOverlayStyle(
       const SystemUiOverlayStyle(
         statusBarIconBrightness: Brightness.light,
@@ -442,31 +467,25 @@ class _HomePageState extends State<HomePage> {
           isLoadingSummary
               ? const Center(child: CircularProgressIndicator())
               : Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                  children: [
-                    StatusInfo(
-                      label: "Hadir",
-                      count: "${monthlySummary['hadir']} Hari",
-                      color: const Color(
-                        0xFF4CAF50,
-                      ),
-                    ),
-                    StatusInfo(
-                      label: "Terlambat",
-                      count: "${monthlySummary['terlambat']} Hari",
-                      color: const Color(
-                        0xFFFF9800,
-                      ),
-                    ),
-                    StatusInfo(
-                      label: "Tidak Hadir",
-                      count: "${monthlySummary['tidakHadir']} Hari",
-                      color: const Color(
-                        0xFFF44336,
-                      ),
-                    ),
-                  ],
-                ),
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: [
+              StatusInfo(
+                label: "Hadir",
+                count: "${monthlySummary['hadir']} Hari",
+                color: const Color(0xFF4CAF50),
+              ),
+              StatusInfo(
+                label: "Terlambat",
+                count: "${monthlySummary['terlambat']} Hari",
+                color: const Color(0xFFFF9800),
+              ),
+              StatusInfo(
+                label: "Tidak Hadir",
+                count: "${monthlySummary['tidakHadir']} Hari",
+                color: const Color(0xFFF44336),
+              ),
+            ],
+          ),
         ],
       ),
     );

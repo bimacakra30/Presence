@@ -3,10 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
-import '../utils/notification_utils.dart'; // Impor file notification_utils yang baru
+import '../utils/notification_utils.dart';
 
 class MapLocationWidget extends StatefulWidget {
-  // Key ditambahkan agar Home Page bisa memanggil refreshLocation()
   const MapLocationWidget({super.key});
 
   @override
@@ -14,103 +13,130 @@ class MapLocationWidget extends StatefulWidget {
 }
 
 class MapLocationWidgetState extends State<MapLocationWidget> {
-  LatLng? _currentPosition; // Posisi pengguna saat ini
-  late Future<bool> _permissionFuture; // Future untuk melacak status izin lokasi
+  LatLng? _currentPosition;
+  late Future<bool> _permissionFuture;
 
-  // Lokasi pusat kantor dan radius yang diizinkan
-  final LatLng centerLocation = LatLng(-7.626858, 111.537677);
+  final LatLng centerLocation = const LatLng(-7.690620, 111.604692);
   final double allowedRadiusInMeters = 50;
-  
-  // Status apakah pengguna berada di dalam radius
+
   bool isWithinRadius = false;
 
   @override
   void initState() {
     super.initState();
-    // Inisialisasi future untuk mendapatkan lokasi saat widget pertama kali dibuat
     _permissionFuture = _fetchLocationAndCheckRadius();
   }
 
-  // Fungsi utama untuk menangani izin lokasi, mendapatkan posisi, dan memeriksa radius
   Future<bool> _fetchLocationAndCheckRadius() async {
-    // Reset status sebelum mencoba mendapatkan lokasi baru
-    setState(() {
-      _currentPosition = null;
-      isWithinRadius = false;
-    });
-
-    // 1. Cek apakah layanan lokasi aktif
-    bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
-    if (!serviceEnabled) {
-      // Menggunakan showCustomSnackBar
-      showCustomSnackBar(context, 'Layanan lokasi tidak aktif. Harap aktifkan GPS Anda.', isError: true);
-      return false; // Gagal karena layanan tidak aktif
+    if (mounted) {
+      setState(() {
+        _currentPosition = null;
+        isWithinRadius = false;
+      });
     }
 
-    // 2. Cek dan minta izin lokasi
+    final serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    if (!mounted) return false;
+    if (!serviceEnabled) {
+      showCustomSnackBar(
+        context,
+        'Layanan lokasi tidak aktif. Harap aktifkan GPS Anda.',
+        isError: true,
+      );
+      return false;
+    }
+
     LocationPermission permission = await Geolocator.checkPermission();
+    if (!mounted) return false;
+
     if (permission == LocationPermission.denied) {
       permission = await Geolocator.requestPermission();
+      if (!mounted) return false;
       if (permission == LocationPermission.denied) {
-        // Menggunakan showCustomSnackBar
-        showCustomSnackBar(context, 'Izin lokasi ditolak. Aplikasi memerlukan izin lokasi.', isError: true);
-        return false; // Gagal karena izin ditolak
+        showCustomSnackBar(
+          context,
+          'Izin lokasi ditolak. Aplikasi memerlukan izin lokasi.',
+          isError: true,
+        );
+        return false;
       }
     }
 
     if (permission == LocationPermission.deniedForever) {
-      // Menggunakan showCustomSnackBar
-      showCustomSnackBar(context, 'Izin lokasi ditolak permanen. Aktifkan di pengaturan perangkat Anda.', isError: true);
-      return false; // Gagal karena izin ditolak permanen
+      if (!mounted) return false;
+      showCustomSnackBar(
+        context,
+        'Izin lokasi ditolak permanen. Aktifkan di pengaturan perangkat Anda.',
+        isError: true,
+      );
+      return false;
     }
 
     try {
-      Position position = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.high, // Akurasi tinggi untuk presensi
+      final position = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+          distanceFilter: 0,
+        ),
       );
+      if (!mounted) return false;
 
-      LatLng currentLatLng = LatLng(position.latitude, position.longitude);
-
-      double distance = _calculateDistance(
+      final currentLatLng = LatLng(position.latitude, position.longitude);
+      final distance = _calculateDistance(
         currentLatLng.latitude,
         currentLatLng.longitude,
         centerLocation.latitude,
         centerLocation.longitude,
       );
 
-      setState(() {
-        _currentPosition = currentLatLng; // Simpan posisi saat ini
-        isWithinRadius = distance <= allowedRadiusInMeters; // Tentukan status radius
-      });
-
-      if (!isWithinRadius) {
-        showCustomSnackBar(context, 'Kamu berada di luar area yang diizinkan (${distance.toStringAsFixed(1)} m).', isError: true);
-      } else {
-        showCustomSnackBar(context, 'Kamu berada di area presensi. (${distance.toStringAsFixed(1)} m).');
+      if (mounted) {
+        setState(() {
+          _currentPosition = currentLatLng;
+          isWithinRadius = distance <= allowedRadiusInMeters;
+        });
       }
-      
+
+      if (!mounted) return isWithinRadius;
+      if (!isWithinRadius) {
+        showCustomSnackBar(
+          context,
+          'Kamu berada di luar area yang diizinkan (${distance.toStringAsFixed(1)} m).',
+          isError: true,
+        );
+      } else {
+        showCustomSnackBar(
+          context,
+          'Kamu berada di area presensi. (${distance.toStringAsFixed(1)} m).',
+        );
+      }
       return isWithinRadius;
     } catch (e) {
+      if (!mounted) return false;
       debugPrint('Error mendapatkan lokasi: $e');
-      showCustomSnackBar(context, 'Gagal mendapatkan lokasi: ${e.toString()}', isError: true);
-      setState(() {
-        _currentPosition = null; // Pastikan posisi diset null jika ada error
-        isWithinRadius = false;
-      });
-      return false; // Gagal karena error saat mendapatkan posisi
+      showCustomSnackBar(
+        context,
+        'Gagal mendapatkan lokasi: $e',
+        isError: true,
+      );
+      if (mounted) {
+        setState(() {
+          _currentPosition = null;
+          isWithinRadius = false;
+        });
+      }
+      return false;
     }
   }
-  
+
   Future<void> refreshLocation() async {
-    setState(() {
-      _permissionFuture = _fetchLocationAndCheckRadius(); // Memulai ulang proses fetch lokasi
-    });
+    if (mounted) {
+      setState(() {
+        _permissionFuture = _fetchLocationAndCheckRadius();
+      });
+    }
   }
 
-  // Fungsi untuk mengembalikan status apakah pengguna berada di dalam radius
-  bool userIsWithinRadius() {
-    return isWithinRadius; // Mengembalikan nilai state isWithinRadius
-  }
+  bool userIsWithinRadius() => isWithinRadius;
 
   @override
   Widget build(BuildContext context) {
@@ -126,14 +152,12 @@ class MapLocationWidgetState extends State<MapLocationWidget> {
       child: ClipRRect(
         borderRadius: BorderRadius.circular(20),
         child: FutureBuilder<bool>(
-          future: _permissionFuture, // Pantau future untuk status izin dan lokasi
+          future: _permissionFuture,
           builder: (context, snapshot) {
-            // Tampilan saat loading
             if (snapshot.connectionState == ConnectionState.waiting) {
               return const Center(child: CircularProgressIndicator());
             }
 
-            // Tampilan jika ada error atau posisi belum didapat
             if (snapshot.hasError || _currentPosition == null) {
               return Center(
                 child: Padding(
@@ -159,15 +183,14 @@ class MapLocationWidgetState extends State<MapLocationWidget> {
               );
             }
 
-            // Tampilan map jika lokasi berhasil didapat
             return Stack(
               children: [
                 FlutterMap(
                   options: MapOptions(
-                    initialCenter: _currentPosition!, // Pusat map ke posisi pengguna
+                    initialCenter: _currentPosition!,
                     initialZoom: 15,
                     interactionOptions: const InteractionOptions(
-                      flags: InteractiveFlag.all & ~InteractiveFlag.rotate, // Nonaktifkan rotasi
+                      flags: InteractiveFlag.all & ~InteractiveFlag.rotate,
                     ),
                   ),
                   children: [
@@ -178,9 +201,9 @@ class MapLocationWidgetState extends State<MapLocationWidget> {
                     CircleLayer(
                       circles: [
                         CircleMarker(
-                          point: centerLocation, // Titik pusat kantor
-                          radius: allowedRadiusInMeters, // Radius yang diizinkan
-                          color: Colors.blue.withOpacity(0.2), // Warna area
+                          point: centerLocation,
+                          radius: allowedRadiusInMeters,
+                          color: Colors.blue.withValues(alpha: 0.2),
                           borderStrokeWidth: 2,
                           borderColor: Colors.blueAccent,
                         ),
@@ -189,13 +212,12 @@ class MapLocationWidgetState extends State<MapLocationWidget> {
                     MarkerLayer(
                       markers: [
                         Marker(
-                          point: _currentPosition!, // Marker posisi pengguna
+                          point: _currentPosition!,
                           width: 40,
                           height: 40,
                           child: Icon(
                             Icons.location_pin,
                             size: 40,
-                            // Warna marker sesuai status di dalam/luar radius
                             color: isWithinRadius ? Colors.green : Colors.red,
                           ),
                         ),
@@ -204,7 +226,6 @@ class MapLocationWidgetState extends State<MapLocationWidget> {
                   ],
                 ),
 
-                // Status informasi di atas map
                 Positioned(
                   top: 16,
                   left: 16,
@@ -212,7 +233,7 @@ class MapLocationWidgetState extends State<MapLocationWidget> {
                   child: Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: isWithinRadius ? Colors.green[600] : Colors.red[600],
+                      color: (isWithinRadius ? Colors.green : Colors.red).withValues(alpha: 0.9),
                       borderRadius: BorderRadius.circular(12),
                       boxShadow: const [
                         BoxShadow(color: Colors.black26, blurRadius: 4, offset: Offset(0, 2)),
@@ -238,22 +259,16 @@ class MapLocationWidgetState extends State<MapLocationWidget> {
     );
   }
 
-  // Fungsi untuk menghitung jarak antara dua koordinat (Haversine formula)
   double _calculateDistance(double lat1, double lon1, double lat2, double lon2) {
-    const earthRadius = 6371000; // Radius bumi dalam meter
+    const earthRadius = 6371000; // meter
     final dLat = _degToRad(lat2 - lat1);
     final dLon = _degToRad(lon2 - lon1);
-
     final a = sin(dLat / 2) * sin(dLat / 2) +
         cos(_degToRad(lat1)) * cos(_degToRad(lat2)) *
             sin(dLon / 2) * sin(dLon / 2);
-
     final c = 2 * atan2(sqrt(a), sqrt(1 - a));
     return earthRadius * c;
   }
 
-  // Fungsi bantu untuk mengubah derajat ke radian
-  double _degToRad(double deg) {
-    return deg * (pi / 180);
-  }
+  double _degToRad(double deg) => deg * (pi / 180);
 }
