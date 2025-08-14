@@ -15,6 +15,7 @@ import '../utils/notification_utils.dart';
 import '../components/maps_location_widget.dart';
 import 'settings_page.dart';
 import 'permit_page.dart';
+import 'package:Presence/components/profile_completion_notification.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -36,24 +37,15 @@ class _HomePageState extends State<HomePage> {
   };
   bool isLoadingSummary = false;
   final GlobalKey<MapLocationWidgetState> _mapKey = GlobalKey();
+  bool _isProfileInComplete = false;
 
   @override
   void initState() {
     super.initState();
-    fetchUsername();
     _loadProfileData();
     fetchPresensiHariIni();
     fetchMonthlyAttendanceSummary();
-  }
-
-  Future<void> fetchUsername() async {
-    final prefs = await SharedPreferences.getInstance();
-    final savedName = prefs.getString('name');
-    if (savedName != null && savedName.isNotEmpty) {
-      setState(() {
-        username = savedName;
-      });
-    }
+    _checkProfileCompletion();
   }
 
   Future<void> _loadProfileData() async {
@@ -64,6 +56,36 @@ class _HomePageState extends State<HomePage> {
         _profilePictureUrl = prefs.getString('profilePictureUrl') ?? '';
       });
     }
+    _checkProfileCompletion();
+  }
+
+  Future<void> _checkProfileCompletion() async {
+    final prefs = await SharedPreferences.getInstance();
+    final name = prefs.getString('name');
+    final email = prefs.getString('email');
+    final firestoreUsername = prefs.getString('username');
+    final profilePictureUrl = prefs.getString('profilePictureUrl');
+    final position = prefs.getString('position');
+    final status = prefs.getString('status');
+    final dateOfBirth = prefs.getString('dateOfBirth');
+  
+    if (name == null || name.isEmpty ||
+        email == null || email.isEmpty ||
+        firestoreUsername == null || firestoreUsername.isEmpty ||
+        profilePictureUrl == null || profilePictureUrl.isEmpty ||
+        position == null || position.isEmpty ||
+        status == null || status.isEmpty ||
+        dateOfBirth == null || dateOfBirth.isEmpty) {
+      if (!mounted) return;
+      setState(() {
+        _isProfileInComplete = true;
+      });
+      } else {
+        if (!mounted) return;
+        setState(() {
+          _isProfileInComplete = false;
+        });
+      }
   }
 
   Future<void> fetchPresensiHariIni() async {
@@ -118,7 +140,7 @@ class _HomePageState extends State<HomePage> {
   Future<void> _handleRefresh() async {
     showCustomSnackBar(context, 'Memperbarui data...');
     await Future.wait([
-      fetchUsername(),
+      _loadProfileData(),
       fetchPresensiHariIni(),
       fetchMonthlyAttendanceSummary(),
       _mapKey.currentState?.refreshLocation() ?? Future.value(),
@@ -293,6 +315,16 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
+  void ShowCustomSnackBar(BuildContext context, String massage, {bool isError = false}) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+      content: Text(massage),
+      backgroundColor: isError ? const Color.fromRGBO(68, 88, 99, 1) : Colors.green,
+      behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     // Mengatur warna ikon status bar agar terlihat jelas
@@ -363,7 +395,6 @@ class _HomePageState extends State<HomePage> {
                                     builder: (_) => const SettingsPage(),
                                   ),
                                 ).then((_) {
-                                  // Panggil fungsi refresh saat kembali dari SettingsPage
                                   _loadProfileData();
                                 });
                               },
@@ -383,6 +414,10 @@ class _HomePageState extends State<HomePage> {
               iconTheme: const IconThemeData(color: Colors.white),
               floating: true,
             ),
+            if (_isProfileInComplete)
+              SliverToBoxAdapter(
+                child: ProfileCompletionNotification(),
+              ),
             SliverList(
               delegate: SliverChildListDelegate([
                 _buildInfoCard(),

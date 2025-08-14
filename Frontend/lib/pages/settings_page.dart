@@ -8,6 +8,7 @@ import 'history.dart';
 import 'permit_history_page.dart';
 import 'change_password_page.dart';
 import 'package:Presence/components/profile_avatar.dart';
+import 'package:Presence/pages/profile_detail_page.dart';
 
 class SettingsPage extends StatefulWidget {
   const SettingsPage({super.key});
@@ -56,7 +57,7 @@ class _SettingsPageState extends State<SettingsPage>
 
   Future<void> _loadUserData() async {
     final prefs = await SharedPreferences.getInstance();
-    if (!mounted) return; // Tambahkan pengecekan ini
+    if (!mounted) return;
 
     setState(() {
       _profilePictureUrl = prefs.getString('profilePictureUrl') ?? '';
@@ -176,13 +177,17 @@ class _SettingsPageState extends State<SettingsPage>
   }
 
   Widget _buildProfileSection() {
+    // Menghilangkan logika pemisahan nama menjadi dua baris karena tidak digunakan di sini
+    // dan bisa menyebabkan kebingungan. Cukup tampilkan _username apa adanya.
+
     return InkWell(
       onTap: () {
-        // Perbaikan: Memanggil _loadUserData() setelah kembali dari EditProfilePage
+        // Navigasi ke ProfileDetailPage, bukan EditProfilePage
         Navigator.push(
           context,
-          MaterialPageRoute(builder: (context) => const EditProfilePage()),
+          MaterialPageRoute(builder: (context) => const ProfileDetailPage()),
         ).then((value) {
+          // Memuat ulang data saat kembali dari ProfileDetailPage (jika ada perubahan dari EditProfilePage di dalamnya)
           _loadUserData();
         });
       },
@@ -211,7 +216,7 @@ class _SettingsPageState extends State<SettingsPage>
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    _username,
+                    _username, // Tampilkan username lengkap
                     style: const TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.w600,
@@ -276,14 +281,14 @@ class _SettingsPageState extends State<SettingsPage>
           subtitle: 'Ubah informasi pribadi',
           onTap: () {
             HapticFeedback.lightImpact();
-            // Perbaikan: Memanggil _loadUserData() setelah kembali dari EditProfilePage
+            // Ini tetap akan menavigasi ke EditProfilePage
             Navigator.push(
               context,
               MaterialPageRoute(
                 builder: (context) => const EditProfilePage(),
               ),
             ).then((value) {
-              _loadUserData();
+              _loadUserData(); // Memanggil _loadUserData() setelah kembali dari EditProfilePage
             });
           },
         ),
@@ -304,7 +309,11 @@ class _SettingsPageState extends State<SettingsPage>
       ],
     );
   }
-  // ... (bagian kode lainnya tetap sama)
+  // ... (Sisa widget _buildNotificationSection, _buildGeneralSection,
+  // _buildSection, _buildMenuItem, _buildSwitchMenuItem,
+  // _buildLogoutButton, _showLogoutDialog, _performLogout,
+  // _showLanguageDialog, _showAboutDialog, _showComingSoonDialog tetap sama)
+
   Widget _buildNotificationSection() {
     return _buildSection(
       title: 'Notifikasi',

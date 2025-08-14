@@ -7,7 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'loading_page.dart';
 import 'package:Presence/components/dialog/forgot_password_dialog.dart';
 import 'home.dart';
-import 'package:bcrypt/bcrypt.dart';
+import 'package:bcrypt/bcrypt.dart'; // Pastikan package ini tersedia
 
 class LoginPage extends StatefulWidget {
   final String? notificationMessage; // <--- Tambahkan properti ini
@@ -21,7 +21,8 @@ class LoginPage extends StatefulWidget {
 }
 
 class _LoginPageState extends State<LoginPage> {
-  final emailController = TextEditingController();
+  final emailController =
+      TextEditingController(); // Menggunakan ini sebagai controller username
   final passwordController = TextEditingController();
   bool isLoading = false;
   bool isObscured = true;
@@ -45,6 +46,13 @@ class _LoginPageState extends State<LoginPage> {
     }
   }
 
+  @override
+  void dispose() {
+    emailController.dispose();
+    passwordController.dispose();
+    super.dispose();
+  }
+
   Future<void> login() async {
     final username = emailController.text.trim();
     final password = passwordController.text.trim();
@@ -60,12 +68,14 @@ class _LoginPageState extends State<LoginPage> {
       return;
     }
 
+    if (!mounted) return;
     Navigator.push(
       context,
       MaterialPageRoute(builder: (_) => const LoadingPage()),
     );
 
     try {
+      // Cari user berdasarkan username
       final query = await FirebaseFirestore.instance
           .collection('employees')
           .where('username', isEqualTo: username)
@@ -73,7 +83,7 @@ class _LoginPageState extends State<LoginPage> {
           .get();
 
       if (query.docs.isEmpty) {
-        Navigator.pop(context);
+        if (Navigator.canPop(context)) Navigator.pop(context);
         setState(() {
           usernameError = "Username tidak ditemukan";
           isLoading = false;
@@ -82,13 +92,13 @@ class _LoginPageState extends State<LoginPage> {
       }
 
       final userDoc = query.docs.first;
-      final hashedPassword = userDoc['password'];
-      final userEmailFromFirestore = userDoc['email'];
+      final data = userDoc.data();
+      final hashedPassword = data['password'] ?? '';
 
+      // Cocokkan BCrypt
       final isMatch = BCrypt.checkpw(password, hashedPassword);
-
       if (!isMatch) {
-        Navigator.pop(context);
+        if (Navigator.canPop(context)) Navigator.pop(context);
         setState(() {
           passwordError = "Password salah";
           isLoading = false;
@@ -96,60 +106,31 @@ class _LoginPageState extends State<LoginPage> {
         return;
       }
 
-      UserCredential userCredential;
-      try {
-        userCredential = await FirebaseAuth.instance.signInWithEmailAndPassword(
-          email: userEmailFromFirestore,
-          password: password,
-        );
-      } on FirebaseAuthException catch (e) {
-        if (!mounted) return;
-        Navigator.pop(context);
-        setState(() {
-          passwordError = "Gagal otentikasi Firebase: ${e.message}";
-          isLoading = false;
-        });
-        return;
-      }
-
-      final firebaseUser = userCredential.user;
-      if (firebaseUser == null) {
-        if (!mounted) Navigator.pop(context);
-        setState(() {
-          usernameError = "Gagal login Firebase Auth (pengguna null)";
-          isLoading = false;
-        });
-        return;
-      }
-
+      // Simpan data ke SharedPreferences
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('name', userDoc['name'] ?? '');
-      await prefs.setString('email', userDoc['email'] ?? '');
-      await prefs.setString('username', userDoc['username'] ?? '');
+      await prefs.setString('name', data['name'] ?? '');
+      await prefs.setString('email', data['email'] ?? '');
+      await prefs.setString('username', data['username'] ?? '');
       await prefs.setString(
         'profilePictureUrl',
-        userDoc['profilePictureUrl'] ?? '',
+        data['profilePictureUrl'] ?? data['profilePictureUrl'] ?? '',
       );
+      await prefs.setString('position', data['position'] ?? '');
+      await prefs.setString('status', data['status'] ?? '');
+      await prefs.setString('address', data['address'] ?? '');
+      await prefs.setString('dateOfBirth', data['dateOfBirth'] ?? '');
+      await prefs.setString('provider', data['provider'] ?? 'manual');
+      await prefs.setString('uid', data['uid'] ?? '');
+      await prefs.setString('createdAt', data['createdAt'] ?? '');
 
-      if (!userDoc.data().containsKey('uid') || userDoc['uid'] == null) {
-        Navigator.pop(context);
-        setState(() {
-          usernameError = "Akun tidak valid (uid tidak ditemukan)";
-          isLoading = false;
-        });
-        return;
-      }
-      await prefs.setString('uid', userDoc['uid']);
-
-      await Future.delayed(const Duration(seconds: 1));
-
+      if (!mounted) return;
       Navigator.pushAndRemoveUntil(
         context,
         MaterialPageRoute(builder: (_) => const HomePage()),
         (route) => false,
       );
     } catch (e) {
-      Navigator.pop(context);
+      if (Navigator.canPop(context)) Navigator.pop(context);
       setState(() {
         passwordError = "Terjadi kesalahan: ${e.toString()}";
         isLoading = false;
@@ -158,6 +139,7 @@ class _LoginPageState extends State<LoginPage> {
   }
 
   Future<void> loginWithGoogle() async {
+    if (!mounted) return;
     Navigator.push(
       context,
       MaterialPageRoute(builder: (_) => const LoadingPage()),
@@ -165,28 +147,11 @@ class _LoginPageState extends State<LoginPage> {
 
     try {
       final googleSignIn = GoogleSignIn();
-      await googleSignIn.signOut(); // Optional: memastikan login ulang
+      await googleSignIn.signOut(); // pastikan fresh login
 
       final GoogleSignInAccount? googleUser = await googleSignIn.signIn();
       if (googleUser == null) {
-        Navigator.pop(context);
-        return;
-      }
-
-      final email = googleUser.email;
-
-      // Cek apakah email terdaftar di Firestore
-      final query = await FirebaseFirestore.instance
-          .collection('employees')
-          .where('email', isEqualTo: email)
-          .limit(1)
-          .get();
-
-      if (query.docs.isEmpty) {
-        Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Akun Google belum terdaftar")),
-        );
+        if (Navigator.canPop(context)) Navigator.pop(context);
         return;
       }
 
@@ -196,29 +161,95 @@ class _LoginPageState extends State<LoginPage> {
         idToken: googleAuth.idToken,
       );
 
-      // Login ke Firebase Auth
-      await FirebaseAuth.instance.signInWithCredential(credential);
+      final UserCredential userCredential = await FirebaseAuth.instance
+          .signInWithCredential(credential);
 
-      // Simpan nama dan email ke SharedPreferences
-      final userDoc = query.docs.first;
+      final firebaseUser = userCredential.user;
+      if (firebaseUser == null) {
+        if (Navigator.canPop(context)) Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("Login Google gagal"),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return;
+      }
+
+      // Cek apakah user sudah ada di Firestore
+      final userDocRef = FirebaseFirestore.instance
+          .collection('employees')
+          .doc(firebaseUser.uid);
+      final userDoc = await userDocRef.get();
+
+      if (!userDoc.exists) {
+        // Buat dokumen baru
+        await userDocRef.set({
+          'uid': firebaseUser.uid,
+          'name': firebaseUser.displayName ?? '',
+          'email': firebaseUser.email ?? '',
+          'username': firebaseUser.email?.split('@')[0] ?? '',
+          'profilePictureUrl': firebaseUser.photoURL ?? '',
+          'position': '',
+          'status': 'aktif',
+          'address': '',
+          'dateOfBirth': '',
+          'provider': 'google',
+          'createdAt': DateTime.now().toIso8601String(),
+        });
+      } else {
+        // Update foto profil kalau ada
+        await userDocRef.update({
+          'profilePictureUrl': firebaseUser.photoURL ?? '',
+        });
+      }
+
+      // Ambil data terbaru
+      final updatedDoc = await userDocRef.get();
+      final data = updatedDoc.data() as Map<String, dynamic>;
+
+      // Simpan ke SharedPreferences
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('name', userDoc['name'] ?? '');
-      await prefs.setString('email', userDoc['email'] ?? '');
-      await prefs.setString('profilePictureUrl', userDoc['profilePictureUrl'] ?? '');
+      await prefs.setString('name', data['name'] ?? '');
+      await prefs.setString('email', data['email'] ?? '');
+      await prefs.setString('username', data['username'] ?? '');
+      await prefs.setString(
+        'profilePictureUrl',
+        data['profilePictureUrl'] ?? '',
+      );
+      await prefs.setString('position', data['position'] ?? '');
+      await prefs.setString('status', data['status'] ?? '');
+      await prefs.setString('address', data['address'] ?? '');
+      await prefs.setString(
+        'dateOfBirth',
+        data['dateOfBirth'] ?? '',
+      );
+      await prefs.setString('provider', data['provider'] ?? 'google');
+      await prefs.setString('uid', data['uid'] ?? '');
+      await prefs.setString('createdAt', data['createdAt'] ?? '');
 
-      await Future.delayed(const Duration(seconds: 2));
-
+      if (!mounted) return;
       Navigator.pushAndRemoveUntil(
         context,
         MaterialPageRoute(builder: (_) => const HomePage()),
         (route) => false,
       );
     } catch (e) {
-      Navigator.pop(context);
+      if (Navigator.canPop(context)) Navigator.pop(context);
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Login Google gagal: ${e.toString()}")),
+        SnackBar(
+          content: Text("Google login error: ${e.toString()}"),
+          backgroundColor: Colors.red,
+        ),
       );
     }
+  }
+
+  void _showForgotPasswordDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => const ForgotPasswordDialog(),
+    );
   }
 
   @override
@@ -295,10 +326,7 @@ class _LoginPageState extends State<LoginPage> {
                     alignment: Alignment.centerRight,
                     child: TextButton(
                       onPressed: () {
-                        showDialog(
-                          context: context,
-                          builder: (context) => const ForgotPasswordDialog(),
-                        );
+                        _showForgotPasswordDialog();
                       },
                       child: const Text(
                         "Forgot Password?",
@@ -343,19 +371,15 @@ class _LoginPageState extends State<LoginPage> {
                   const SizedBox(height: 16),
                   SizedBox(
                     width: double.infinity,
-                    child: OutlinedButton.icon(
+                    child: OutlinedButton(
                       onPressed: isLoading ? null : loginWithGoogle,
-                      icon: Image.asset(
-                        'assets/images/google_logo.png',
-                        height: 20,
-                      ),
-                      label: const Text("Continue with Google"),
                       style: OutlinedButton.styleFrom(
                         padding: const EdgeInsets.symmetric(vertical: 14),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
                         ),
                       ),
+                      child: const Text("Continue with Google"),
                     ),
                   ),
                   const SizedBox(height: 8),
