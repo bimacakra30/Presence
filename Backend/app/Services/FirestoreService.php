@@ -166,4 +166,46 @@ class FirestoreService
         $collection->document((string)$id)->set($data, ['merge' => true]);
     }
 
+    public function getCollectionMaps()
+    {
+        return $this->db->collection('geo_locator');
+    }
+
+
+    public function createMaps($collectionName, $id, array $data)
+    {
+        $collection = $this->db->collection($collectionName);
+        $collection->document((string)$id)->set($data);
+    }
+
+    public function deleteMaps($collectionName, $id)
+    {
+        $collection = $this->db->collection($collectionName);
+        $collection->document((string)$id)->delete();
+    }
+
+
+    public function updateMaps($collectionName, $id, array $data)
+    {
+        $collection = $this->db->collection($collectionName);
+        $collection->document((string)$id)->set($data, ['merge' => true]);
+    }
+
+    public function getMaps()
+    {
+        $collection = $this->db->collection('geo_locator');
+        $documents = $collection->documents();
+
+        $users = [];
+        foreach ($documents as $document) {
+            if ($document->exists()) {
+                $data = $document->data();
+                $data['id'] = $document->id();
+                $users[] = $data;
+            }
+        }
+
+        return $users;
+    }
+
 }

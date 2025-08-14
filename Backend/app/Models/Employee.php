@@ -57,10 +57,13 @@ class Employee extends Model
 
             $data = [
                 'uid' => $employee->uid,
+                'ProfilePictureUrl' =>$employee->photo,
                 'name' => $employee->name,
                 'username' => $employee->username,
                 'email' => $employee->email,
                 'password' => $employee->password,
+                'address' => $employee->address,
+                'date_of_birth' => $employee->date_of_birth,
                 'position' => $employee->position,
                 'status' => $employee->status,
                 'provider' => $employee->provider,
@@ -73,7 +76,7 @@ class Employee extends Model
             $employee->firestore_id = $docRef->id();
             $employee->saveQuietly();
 
-            // Simpan ke Firebase Auth
+            // Simpan ke Firebase Authx
             try {
                 $auth = app('firebase.auth');
 
@@ -81,7 +84,9 @@ class Employee extends Model
                     'uid' => $employee->uid,
                     'email' => $employee->email,
                     'password' => $employee->password, // Sudah di-hash, akan error jika tidak plain
-                    'displayName' => $employee->name,
+                    'address' => $employee->address,
+                    'date_of_birth' => $employee->date_of_birth,
+                    'name' => $employee->name,
                 ]);
             } catch (\Kreait\Firebase\Exception\Auth\EmailExists $e) {
                 Log::warning('Email already exists in Firebase Auth: ' . $employee->email);
