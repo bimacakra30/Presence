@@ -16,12 +16,12 @@ class _PermitHistoryPageState extends State<PermitHistoryPage>
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
 
-  String _selectedFilter = 'All';
+  String _selectedFilter = 'all'; // PERBAIKAN: Inisialisasi dengan 'all' huruf kecil
   final List<String> _filterOptions = [
-    'All',
-    'Pending',
-    'Approved',
-    'Rejected',
+    'all',
+    'pending',
+    'approved',
+    'rejected',
   ];
 
   @override
@@ -47,17 +47,45 @@ class _PermitHistoryPageState extends State<PermitHistoryPage>
   Stream<QuerySnapshot> getPermitHistoryStream() {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
+      debugPrint('User is null, returning empty stream for permit history.');
       return const Stream.empty();
     }
 
-    return FirebaseFirestore.instance
+    Query collectionQuery = FirebaseFirestore.instance
         .collection('permits')
-        .where('uid', isEqualTo: user.uid)
-        .orderBy('submissionDate', descending: true)
-        .snapshots();
+        .where('uid', isEqualTo: user.uid);
+
+    // Filter berdasarkan status hanya jika _selectedFilter BUKAN 'all'
+    // Perbandingan status akan dilakukan di UI (StreamBuilder) untuk fleksibilitas
+    // (karena Firestore .where() itu case-sensitive dan kita punya opsi 'all')
+
+    // Always order by submissionDate for consistency
+    collectionQuery = collectionQuery.orderBy('submissionDate', descending: true);
+
+    debugPrint('Fetching permit history for UID: ${user.uid} with filter: $_selectedFilter');
+    return collectionQuery.snapshots();
   }
 
+  Future<String> _fetchEmployeeName(String uid) async {
+    if (uid.isEmpty) {
+      debugPrint('UID is empty, cannot fetch employee name.');
+      return 'Pengguna Tidak Ditemukan';
+    }
+    try {
+      final doc = await FirebaseFirestore.instance.collection('employees').doc(uid).get();
+      if (doc.exists && doc.data() != null) {
+        return doc.data()!['name'] ?? 'Nama Tidak Ditemukan';
+      }
+    } catch (e) {
+      debugPrint('Error fetching employee name for UID $uid: $e');
+    }
+    return 'Nama Tidak Ditemukan';
+  }
+
+
   Map<String, dynamic> _getStatusInfo(String status) {
+    debugPrint('Processing status: $status (Lowercase: ${status.toLowerCase()})');
+
     switch (status.toLowerCase()) {
       case 'approved':
         return {
@@ -73,12 +101,20 @@ class _PermitHistoryPageState extends State<PermitHistoryPage>
           'icon': Icons.cancel_outlined,
           'label': 'Ditolak',
         };
-      default: // pending
+      case 'pending': // Explicitly handle 'pending' case
         return {
           'color': Colors.orange.shade500,
           'backgroundColor': Colors.orange.shade50,
           'icon': Icons.access_time,
           'label': 'Menunggu',
+        };
+      default: // Fallback for any other string
+        debugPrint('Unknown status encountered: "$status". Defaulting to "Menunggu".');
+        return {
+          'color': Colors.orange.shade500, // Default to orange for unknown
+          'backgroundColor': Colors.orange.shade50,
+          'icon': Icons.access_time,
+          'label': 'Menunggu', // Default to 'Menunggu' for safety
         };
     }
   }
@@ -94,7 +130,7 @@ class _PermitHistoryPageState extends State<PermitHistoryPage>
       case 'Annual Leave':
         return {
           'icon': Icons.beach_access,
-          'color': Colors.blue.shade400,
+          'color': const Color(0xFF00BCD4),
           'label': 'Cuti Tahunan',
         };
       case 'Personal Leave':
@@ -119,6 +155,7 @@ class _PermitHistoryPageState extends State<PermitHistoryPage>
       final end = DateTime.parse(endDate);
       return end.difference(start).inDays + 1;
     } catch (e) {
+      debugPrint('Error calculating duration: $e');
       return 0;
     }
   }
@@ -139,7 +176,8 @@ class _PermitHistoryPageState extends State<PermitHistoryPage>
             margin: const EdgeInsets.only(right: 10),
             child: FilterChip(
               label: Text(
-                filter == 'All' ? 'Semua' : _getStatusInfo(filter)['label'],
+                // PERBAIKAN: Pastikan label filter juga menggunakan case yang konsisten
+                filter == 'all' ? 'Semua' : _getStatusInfo(filter)['label'],
                 style: TextStyle(
                   color: isSelected ? Colors.white : Colors.grey.shade700,
                   fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
@@ -149,11 +187,11 @@ class _PermitHistoryPageState extends State<PermitHistoryPage>
               onSelected: (selected) {
                 HapticFeedback.lightImpact();
                 setState(() {
-                  _selectedFilter = selected ? filter : 'All';
+                  _selectedFilter = selected ? filter : 'all'; // PERBAIKAN: Gunakan 'all' huruf kecil
                 });
               },
               backgroundColor: Colors.grey.shade100,
-              selectedColor: const Color(0xFF00A0E3),
+              selectedColor: const Color(0xFF00BCD4),
               checkmarkColor: Colors.white,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(20),
@@ -188,7 +226,7 @@ class _PermitHistoryPageState extends State<PermitHistoryPage>
             ),
             const SizedBox(height: 24),
             Text(
-              _selectedFilter == 'All'
+              _selectedFilter == 'all' // PERBAIKAN: Gunakan 'all' huruf kecil
                   ? 'Belum Ada Riwayat Izin'
                   : 'Tidak Ada Izin ${_getStatusInfo(_selectedFilter)['label']}',
               style: TextStyle(
@@ -199,7 +237,7 @@ class _PermitHistoryPageState extends State<PermitHistoryPage>
             ),
             const SizedBox(height: 8),
             Text(
-              _selectedFilter == 'All'
+              _selectedFilter == 'all' // PERBAIKAN: Gunakan 'all' huruf kecil
                   ? 'Riwayat perizinan Anda akan muncul di sini'
                   : 'Coba ganti filter untuk melihat izin lainnya',
               style: TextStyle(fontSize: 16, color: Colors.grey.shade500),
@@ -255,7 +293,7 @@ class _PermitHistoryPageState extends State<PermitHistoryPage>
             icon: const Icon(Icons.refresh),
             label: const Text('Coba Lagi'),
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF00A0E3),
+              backgroundColor: const Color(0xFF00BCD4),
               foregroundColor: Colors.white,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
@@ -274,12 +312,15 @@ class _PermitHistoryPageState extends State<PermitHistoryPage>
     final endDate = permit['endDate'] ?? 'N/A';
     final description = permit['description'] ?? '';
     final submissionDate = permit['submissionDate'] ?? '';
+    final uid = permit['uid'] ?? '';
+
+    debugPrint('Permit Card #$index - Raw Status from Firestore: "$status"'); // Debug print untuk raw status
+    debugPrint('Permit Card #$index - Filter: "$_selectedFilter"'); // Debug print untuk filter yang aktif
 
     final statusInfo = _getStatusInfo(status);
     final typeInfo = _getPermitTypeInfo(permitType);
     final duration = _calculateDuration(startDate, endDate);
 
-    // Format tanggal
     String formattedStartDate = 'N/A';
     String formattedEndDate = 'N/A';
     String formattedSubmissionDate = '';
@@ -298,7 +339,7 @@ class _PermitHistoryPageState extends State<PermitHistoryPage>
         formattedSubmissionDate = DateFormat('dd MMM yyyy, HH:mm').format(date);
       }
     } catch (e) {
-      debugPrint('Failed to parse date: $e');
+      debugPrint('Failed to parse date in _buildPermitCard: $e');
     }
 
     return AnimatedBuilder(
@@ -349,7 +390,6 @@ class _PermitHistoryPageState extends State<PermitHistoryPage>
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // Header Row
                         Row(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
@@ -370,58 +410,84 @@ class _PermitHistoryPageState extends State<PermitHistoryPage>
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Row(
-                                    mainAxisAlignment:
-                                        MainAxisAlignment.spaceBetween,
-                                    children: [
-                                      Expanded(
-                                        child: Text(
-                                          typeInfo['label'],
-                                          style: const TextStyle(
+                                  FutureBuilder<String>(
+                                    future: _fetchEmployeeName(uid),
+                                    builder: (context, snapshot) {
+                                      if (snapshot.connectionState == ConnectionState.waiting) {
+                                        return const Text(
+                                          'Memuat Nama...',
+                                          style: TextStyle(
                                             fontSize: 16,
                                             fontWeight: FontWeight.w600,
-                                            color: Colors.black87,
+                                            color: Colors.black54,
                                           ),
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                      ),
-                                      const SizedBox(width: 8),
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 12,
-                                          vertical: 6,
-                                        ),
-                                        decoration: BoxDecoration(
-                                          color: statusInfo['backgroundColor'],
-                                          borderRadius: BorderRadius.circular(
-                                            20,
+                                        );
+                                      }
+                                      if (snapshot.hasError) {
+                                        debugPrint('Error fetching employee name in card: ${snapshot.error}');
+                                        return const Text(
+                                          'Nama tidak tersedia',
+                                          style: TextStyle(
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.w600,
+                                            color: Colors.red,
                                           ),
-                                          border: Border.all(
-                                            color: statusInfo['color']
-                                                .withOpacity(0.3),
-                                          ),
-                                        ),
-                                        child: Row(
-                                          mainAxisSize: MainAxisSize.min,
-                                          children: [
-                                            Icon(
-                                              statusInfo['icon'],
-                                              color: statusInfo['color'],
-                                              size: 14,
-                                            ),
-                                            const SizedBox(width: 4),
-                                            Text(
-                                              statusInfo['label'],
-                                              style: TextStyle(
-                                                color: statusInfo['color'],
-                                                fontSize: 12,
+                                        );
+                                      }
+                                      return Row(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.spaceBetween,
+                                        children: [
+                                          Expanded(
+                                            child: Text(
+                                              snapshot.data ?? 'Nama Tidak Ditemukan',
+                                              style: const TextStyle(
+                                                fontSize: 16,
                                                 fontWeight: FontWeight.w600,
+                                                color: Colors.black87,
+                                              ),
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                          ),
+                                          const SizedBox(width: 8),
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 12,
+                                              vertical: 6,
+                                            ),
+                                            decoration: BoxDecoration(
+                                              color: statusInfo['backgroundColor'],
+                                              borderRadius: BorderRadius.circular(
+                                                20,
+                                              ),
+                                              border: Border.all(
+                                                color: statusInfo['color']
+                                                    .withOpacity(0.3),
                                               ),
                                             ),
-                                          ],
-                                        ),
-                                      ),
-                                    ],
+                                            child: Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                Icon(
+                                                  statusInfo['icon'],
+                                                  color: statusInfo['color'],
+                                                  size: 14,
+                                                ),
+                                                const SizedBox(width: 4),
+                                                Text(
+                                                  statusInfo['label'],
+                                                  style: TextStyle(
+                                                    color: statusInfo['color'],
+                                                    fontSize: 12,
+                                                    fontWeight: FontWeight.w600,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ],
+                                      );
+                                    },
                                   ),
                                   if (formattedSubmissionDate.isNotEmpty)
                                     Padding(
@@ -441,7 +507,6 @@ class _PermitHistoryPageState extends State<PermitHistoryPage>
                         ),
                         const SizedBox(height: 16),
 
-                        // Date and Duration Info
                         Container(
                           padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
@@ -480,7 +545,7 @@ class _PermitHistoryPageState extends State<PermitHistoryPage>
                                     '$duration hari',
                                     style: TextStyle(
                                       fontSize: 12,
-                                      color: Colors.blue.shade700,
+                                      color: const Color(0xFF00BCD4),
                                       fontWeight: FontWeight.w600,
                                     ),
                                   ),
@@ -614,7 +679,6 @@ class _PermitHistoryPageState extends State<PermitHistoryPage>
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // Handle Bar
             Container(
               width: 40,
               height: 4,
@@ -625,7 +689,6 @@ class _PermitHistoryPageState extends State<PermitHistoryPage>
             ),
             const SizedBox(height: 20),
 
-            // Header
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20),
               child: Row(
@@ -633,9 +696,7 @@ class _PermitHistoryPageState extends State<PermitHistoryPage>
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: typeInfo['color'].withValues(
-                        alpha: 0.1 * 255,
-                      ), // Perbaikan: Menghapus .round()
+                      color: statusInfo['color'].withOpacity(0.1),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Icon(
@@ -695,7 +756,6 @@ class _PermitHistoryPageState extends State<PermitHistoryPage>
 
             const SizedBox(height: 24),
 
-            // Details
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20),
               child: Column(
@@ -731,7 +791,7 @@ class _PermitHistoryPageState extends State<PermitHistoryPage>
                         },
                         child: const Text(
                           'Lihat',
-                          style: TextStyle(color: Colors.blue),
+                          style: TextStyle(color: Color(0xFF00BCD4)),
                         ),
                       ),
                     ),
@@ -819,119 +879,52 @@ class _PermitHistoryPageState extends State<PermitHistoryPage>
 
     return Scaffold(
       backgroundColor: Colors.grey.shade50,
-      body: CustomScrollView(
-        slivers: [
-          // App Bar
-          SliverAppBar(
-            expandedHeight: 111,
-            backgroundColor: const Color(0xFF00A0E3),
-            elevation: 0,
-            pinned: true,
-            stretch: true,
-            leading: IconButton(
-              icon: const Icon(Icons.arrow_back_ios, color: Colors.white),
-              onPressed: () => Navigator.of(context).pop(),
-            ),
-            flexibleSpace: FlexibleSpaceBar(
-              stretchModes: const [StretchMode.zoomBackground],
-              background: Container(
-                decoration: const BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [
-                      Color(0xFF00A0E3),
-                      Color.fromARGB(255, 132, 220, 231),
-                    ],
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                  ),
-                ),
-                child: const SafeArea(
-                  child: Padding(
-                    padding: EdgeInsets.only(bottom: 12.0, right: 40.0),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      children: [
-                        Text(
-                          'Riwayat Perizinan',
-                          style: TextStyle(
-                            fontSize: 28,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                            letterSpacing: 0.5,
-                          ),
-                        ),
-                        SizedBox(height: 8),
-                        Text(
-                          'Lihat Semua pengajuan izin anda',
-                          style: TextStyle(
-                            fontSize: 16,
-                            color: Colors.white70,
-                            fontWeight: FontWeight.w400,
-                          ),
-                        ),
-                        SizedBox(height: 20),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
+      appBar: AppBar(
+        title: const Text('Riwayat Perizinan'),
+        backgroundColor: const Color(0xFF00BCD4),
+        foregroundColor: Colors.white,
+        elevation: 0,
+        systemOverlayStyle: SystemUiOverlayStyle.light,
+      ),
+      body: Column(
+        children: [
+          _buildFilterChips(),
+          Expanded(
+            child: StreamBuilder<QuerySnapshot>(
+              stream: getPermitHistoryStream(),
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+
+                if (snapshot.hasError) {
+                  debugPrint('StreamBuilder error: ${snapshot.error}');
+                  return _buildErrorState('Gagal memuat riwayat izin: ${snapshot.error}');
+                }
+
+                final allPermits = snapshot.data!.docs;
+                // PERBAIKAN: Konversi status dari Firestore ke huruf kecil untuk perbandingan
+                final filteredPermits = allPermits.where((doc) {
+                  final permit = doc.data() as Map<String, dynamic>;
+                  final permitStatusLowerCase = (permit['status'] as String).toLowerCase();
+                  return _selectedFilter == 'all' || permitStatusLowerCase == _selectedFilter;
+                }).toList();
+
+                if (filteredPermits.isEmpty) {
+                  return _buildEmptyState();
+                }
+
+                return ListView.builder(
+                  padding: const EdgeInsets.only(bottom: 20),
+                  itemCount: filteredPermits.length,
+                  itemBuilder: (context, index) {
+                    final permit = filteredPermits[index].data() as Map<String, dynamic>;
+                    return _buildPermitCard(permit, index);
+                  },
+                );
+              },
             ),
           ),
-
-          // Filter Chips
-          SliverToBoxAdapter(child: _buildFilterChips()),
-
-          // Content
-          StreamBuilder<QuerySnapshot>(
-            stream: getPermitHistoryStream(),
-            builder: (context, snapshot) {
-              if (snapshot.connectionState == ConnectionState.waiting) {
-                return const SliverFillRemaining(
-                  child: Center(
-                    child: CircularProgressIndicator(
-                      valueColor: AlwaysStoppedAnimation<Color>(
-                        Color(0xFF00A0E3),
-                      ),
-                    ),
-                  ),
-                );
-              }
-
-              if (snapshot.hasError) {
-                return SliverFillRemaining(
-                  child: _buildErrorState('Error: ${snapshot.error}'),
-                );
-              }
-
-              if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-                return SliverFillRemaining(child: _buildEmptyState());
-              }
-
-              final allPermits = snapshot.data!.docs;
-              final filteredPermits = _selectedFilter == 'All'
-                  ? allPermits
-                  : allPermits.where((doc) {
-                      final permit = doc.data() as Map<String, dynamic>;
-                      return permit['status'] == _selectedFilter;
-                    }).toList();
-
-              if (filteredPermits.isEmpty) {
-                return SliverFillRemaining(child: _buildEmptyState());
-              }
-
-              return SliverList(
-                delegate: SliverChildBuilderDelegate((context, index) {
-                  final permit =
-                      filteredPermits[index].data() as Map<String, dynamic>;
-                  return _buildPermitCard(permit, index);
-                }, childCount: filteredPermits.length),
-              );
-            },
-          ),
-
-          // Bottom Padding
-          const SliverToBoxAdapter(child: SizedBox(height: 20)),
         ],
       ),
     );

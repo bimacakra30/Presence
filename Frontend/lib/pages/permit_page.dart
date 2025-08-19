@@ -40,7 +40,7 @@ class _PermitPageState extends State<PermitPage> with TickerProviderStateMixin {
       'value': 'Annual Leave',
       'label': 'Cuti Tahunan',
       'icon': Icons.beach_access,
-      'color': Colors.blue.shade400,
+      'color': const Color(0xFF00BCD4),
       'description': 'Cuti tahunan untuk refreshing'
     },
     {
@@ -695,13 +695,13 @@ class _PermitPageState extends State<PermitPage> with TickerProviderStateMixin {
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(Icons.info, color: Colors.blue.shade600, size: 20),
+                  Icon(Icons.info, color: const Color(0xFF00BCD4), size: 20),
                   const SizedBox(width: 8),
                   Flexible(
                     child: Text(
                       'Durasi: ${_endDate!.difference(_startDate!).inDays + 1} hari',
                       style: TextStyle(
-                        color: Colors.blue.shade700,
+                        color: const Color(0xFF00BCD4),
                         fontWeight: FontWeight.w500,
                         fontSize: 14,
                       ),
