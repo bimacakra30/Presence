@@ -2,11 +2,11 @@ import 'package:Presence/pages/edit_profile_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'login_page.dart';
 import 'history.dart';
 import 'permit_history_page.dart';
-import 'change_password_page.dart';
 import 'package:Presence/components/profile_avatar.dart';
 import 'package:Presence/pages/profile_detail_page.dart';
 
@@ -116,7 +116,7 @@ class _SettingsPageState extends State<SettingsPage>
         background: Container(
           decoration: const BoxDecoration(
             gradient: LinearGradient(
-              colors: [Color(0xFF00A0E3), Color.fromARGB(255, 132, 220, 231)],
+              colors: [Color(0xFF00BCD4), Color(0xFF00ACC1)],
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
             ),
@@ -292,28 +292,9 @@ class _SettingsPageState extends State<SettingsPage>
             });
           },
         ),
-        _buildMenuItem(
-          icon: Icons.lock_outline,
-          title: 'Ubah Kata Sandi',
-          subtitle: 'Perbarui kata sandi akun',
-          onTap: () {
-            HapticFeedback.lightImpact();
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => const ChangePasswordPage(),
-              ),
-            );
-          },
-        ),
       ],
     );
   }
-  // ... (Sisa widget _buildNotificationSection, _buildGeneralSection,
-  // _buildSection, _buildMenuItem, _buildSwitchMenuItem,
-  // _buildLogoutButton, _showLogoutDialog, _performLogout,
-  // _showLanguageDialog, _showAboutDialog, _showComingSoonDialog tetap sama)
-
   Widget _buildNotificationSection() {
     return _buildSection(
       title: 'Notifikasi',
@@ -626,51 +607,64 @@ class _SettingsPageState extends State<SettingsPage>
   }
 
   Future<void> _performLogout() async {
-    try {
-      showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (context) => const Center(
-          child: Card(
-            child: Padding(
-              padding: EdgeInsets.all(20),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  CircularProgressIndicator(),
-                  SizedBox(height: 16),
-                  Text('Keluar dari akun...'),
-                ],
-              ),
+  try {
+    // Tampilkan dialog loading
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Center(
+        child: Card(
+          child: Padding(
+            padding: EdgeInsets.all(20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                CircularProgressIndicator(),
+                SizedBox(height: 16),
+                Text('Keluar dari akun...'),
+              ],
             ),
           ),
         ),
+      ),
+    );
+
+    // Logout dari Google Sign-In
+    final googleSignIn = GoogleSignIn();
+    await googleSignIn.signOut();
+
+    // Logout dari Firebase Authentication
+    await FirebaseAuth.instance.signOut();
+
+    // Hapus data lokal dari SharedPreferences
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.clear();
+
+    // Tutup dialog loading
+    if (mounted) {
+      Navigator.pop(context); // Tutup dialog sebelum navigasi
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(builder: (context) => const LoginPage()),
+        (route) => false,
       );
-
-      await FirebaseAuth.instance.signOut();
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.clear();
-
-      if (mounted) {
-        Navigator.pushAndRemoveUntil(
-          context,
-          MaterialPageRoute(builder: (context) => const LoginPage()),
-          (route) => false,
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        Navigator.pop(context); // Tutup dialog loading
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Gagal logout: ${e.toString()}'),
-            backgroundColor: Colors.red,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
-      }
     }
+    debugPrint('Logout berhasil. Semua sesi dan data lokal dihapus.');
+  } catch (e) {
+    // Tutup dialog loading jika ada error
+    if (mounted) {
+      Navigator.pop(context);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Gagal logout: ${e.toString()}'),
+          backgroundColor: Colors.red,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+    debugPrint('Error saat logout: $e');
   }
+}
 
   void _showLanguageDialog() {
     showDialog(
