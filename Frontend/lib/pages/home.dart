@@ -3,9 +3,9 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
-import '../components/profile_avatar.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../utils/cloudinary_service.dart';
 import '../components/home_widgets.dart';
@@ -30,11 +30,7 @@ class _HomePageState extends State<HomePage> {
   DateTime? clockInTime;
   DateTime? clockOutTime;
   bool? lateStatus;
-  Map<String, int> monthlySummary = {
-    'hadir': 0,
-    'terlambat': 0,
-    'tidakHadir': 0,
-  };
+  Map<String, int> monthlySummary = {'hadir': 0, 'izin': 0, 'tidakHadir': 0};
   bool isLoadingSummary = false;
   final GlobalKey<MapLocationWidgetState> _mapKey = GlobalKey();
   bool _isProfileInComplete = false;
@@ -45,6 +41,7 @@ class _HomePageState extends State<HomePage> {
     _loadProfileData();
     fetchPresensiHariIni();
     fetchMonthlyAttendanceSummary();
+    _fetchMonthlyPermitsSummary();
     _checkProfileCompletion();
   }
 
@@ -52,7 +49,7 @@ class _HomePageState extends State<HomePage> {
     final prefs = await SharedPreferences.getInstance();
     if (mounted) {
       setState(() {
-        username = prefs.getString('name') ?? 'Pengguna';
+        username = prefs.getString('username') ?? 'Pengguna';
         _profilePictureUrl = prefs.getString('profilePictureUrl') ?? '';
       });
     }
@@ -64,28 +61,26 @@ class _HomePageState extends State<HomePage> {
     final name = prefs.getString('name');
     final email = prefs.getString('email');
     final firestoreUsername = prefs.getString('username');
-    final profilePictureUrl = prefs.getString('profilePictureUrl');
-    final position = prefs.getString('position');
-    final status = prefs.getString('status');
     final dateOfBirth = prefs.getString('dateOfBirth');
-  
-    if (name == null || name.isEmpty ||
-        email == null || email.isEmpty ||
-        firestoreUsername == null || firestoreUsername.isEmpty ||
-        profilePictureUrl == null || profilePictureUrl.isEmpty ||
-        position == null || position.isEmpty ||
-        status == null || status.isEmpty ||
-        dateOfBirth == null || dateOfBirth.isEmpty) {
+
+    if (name == null ||
+        name.isEmpty ||
+        email == null ||
+        email.isEmpty ||
+        firestoreUsername == null ||
+        firestoreUsername.isEmpty ||
+        dateOfBirth == null ||
+        dateOfBirth.isEmpty) {
       if (!mounted) return;
       setState(() {
         _isProfileInComplete = true;
       });
-      } else {
-        if (!mounted) return;
-        setState(() {
-          _isProfileInComplete = false;
-        });
-      }
+    } else {
+      if (!mounted) return;
+      setState(() {
+        _isProfileInComplete = false;
+      });
+    }
   }
 
   Future<void> fetchPresensiHariIni() async {
@@ -121,19 +116,137 @@ class _HomePageState extends State<HomePage> {
     try {
       final summary = await fetchMonthlyAttendance();
       setState(() {
-        monthlySummary = summary;
+        monthlySummary['hadir'] = summary['hadir'] ?? 0;
+        monthlySummary['tidakHadir'] = summary['tidakHadir'] ?? 0;
+        monthlySummary['izin'] = summary['izin'] ?? 0;
       });
     } catch (e) {
       debugPrint('Error fetching monthly attendance: $e');
-      showCustomSnackBar(
-        context,
-        'Gagal memuat rekap presensi: $e',
-        isError: true,
-      );
+      if (mounted) {
+        // Periksa mounted sebelum showSnackBar
+        showCustomSnackBar(
+          context,
+          'Gagal memuat rekap presensi: $e',
+          isError: true,
+        );
+      }
     } finally {
-      setState(() {
-        isLoadingSummary = false;
-      });
+      if (mounted) {
+        // Periksa mounted sebelum setState
+        setState(() {
+          isLoadingSummary = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _fetchMonthlyPermitsSummary() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      debugPrint('User not logged in, cannot fetch permit summary.');
+      return;
+    }
+
+    try {
+      final now = DateTime.now();
+      final startOfMonth = DateTime(now.year, now.month, 1);
+      final endOfMonth = DateTime(now.year, now.month + 1, 0, 23, 59, 59);
+
+      debugPrint(
+        'Fetching permits for month: ${DateFormat('yyyy-MM').format(now)}',
+      );
+      debugPrint('Start date query: ${startOfMonth.toIso8601String()}');
+      debugPrint('End date query: ${endOfMonth.toIso8601String()}');
+
+      final querySnapshot = await FirebaseFirestore.instance
+          .collection('permits')
+          .where('uid', isEqualTo: user.uid)
+          .where(
+            'submissionDate',
+            isGreaterThanOrEqualTo: startOfMonth.toIso8601String(),
+          )
+          .where(
+            'submissionDate',
+            isLessThanOrEqualTo: endOfMonth.toIso8601String(),
+          )
+          .get();
+
+      int approvedPermitsWorkDaysCount =
+          0; // Menggunakan nama variabel yang lebih jelas
+
+      debugPrint(
+        'Found ${querySnapshot.docs.length} permit documents for current user and month.',
+      );
+
+      for (var doc in querySnapshot.docs) {
+        final data = doc.data();
+        final status = (data['status'] as String?)?.toLowerCase();
+
+        debugPrint('Processing permit ID: ${doc.id}, Status: "$status"');
+
+        if (status == 'approved') {
+          final startDateString = data['startDate'] as String?;
+          final endDateString = data['endDate'] as String?;
+
+          debugPrint(
+            'Approved permit: startDate: "$startDateString", endDate: "$endDateString"',
+          );
+
+          if (startDateString != null && endDateString != null) {
+            try {
+              final startDate = DateTime.parse(startDateString);
+              final endDate = DateTime.parse(endDateString);
+
+              int currentPermitWorkDays = 0;
+              DateTime currentDate = startDate;
+
+              // Iterate through each day in the permit range
+              while (currentDate.isBefore(
+                endDate.add(const Duration(days: 1)),
+              )) {
+                // Check if it's not a Sunday and not a national holiday
+                if (currentDate.weekday != DateTime.sunday &&
+                    !parsedHolidays.any(
+                      (holiday) => isSameDay(holiday, currentDate),
+                    )) {
+                  currentPermitWorkDays++;
+                } else {
+                  debugPrint(
+                    'Excluded date (Sunday or Holiday): ${DateFormat('yyyy-MM-dd').format(currentDate)}',
+                  );
+                }
+                currentDate = currentDate.add(const Duration(days: 1));
+              }
+              approvedPermitsWorkDaysCount += currentPermitWorkDays;
+              debugPrint(
+                'Calculated work days for this permit: $currentPermitWorkDays days. Total approved work days: $approvedPermitsWorkDaysCount',
+              );
+            } catch (e) {
+              debugPrint(
+                'Error parsing date for permit duration in _fetchMonthlyPermitsSummary: $e',
+              );
+            }
+          }
+        }
+      }
+
+      if (mounted) {
+        setState(() {
+          monthlySummary['izin'] = approvedPermitsWorkDaysCount;
+          debugPrint(
+            'Final monthlySummary[\'izin\'] set to: ${monthlySummary['izin']}',
+          );
+        });
+      }
+    } catch (e) {
+      debugPrint('Error fetching monthly permits summary: $e');
+      if (mounted) {
+        showCustomSnackBar(
+          context,
+          'Gagal memuat rekap izin: $e',
+          isError: true,
+        );
+      }
     }
   }
 
@@ -143,6 +256,7 @@ class _HomePageState extends State<HomePage> {
       _loadProfileData(),
       fetchPresensiHariIni(),
       fetchMonthlyAttendanceSummary(),
+      _fetchMonthlyPermitsSummary(),
       _mapKey.currentState?.refreshLocation() ?? Future.value(),
     ]);
     showCustomSnackBar(context, 'Data berhasil diperbarui');
@@ -168,6 +282,18 @@ class _HomePageState extends State<HomePage> {
       }
       message += reasons.join(' dan ');
       showCustomSnackBar(context, message, isError: true);
+      return;
+    }
+
+    final activeOfficeName = _mapKey.currentState?.activeOfficeName;
+    if (activeOfficeName == null) {
+      if (mounted) {
+        showCustomSnackBar(
+          context,
+          'Tidak dapat menentukan lokasi presensi saat ini. Pastikan GPS aktif dan berada di area kantor.',
+          isError: true,
+        );
+      }
       return;
     }
 
@@ -215,6 +341,7 @@ class _HomePageState extends State<HomePage> {
         publicId: uploadResult['public_id'],
         now: now,
         existingQuery: existingQuery,
+        locationName: activeOfficeName,
       );
 
       await fetchPresensiHariIni();
@@ -236,6 +363,7 @@ class _HomePageState extends State<HomePage> {
     required String publicId,
     required DateTime now,
     required QuerySnapshot existingQuery,
+    required String locationName,
   }) async {
     try {
       final todayStart = DateTime(now.year, now.month, now.day);
@@ -268,6 +396,7 @@ class _HomePageState extends State<HomePage> {
           'fotoClockInPublicId': publicId,
           'late': isLate,
           if (lateDuration != null) 'lateDuration': lateDuration,
+          'locationName': locationName,
         });
         setState(() {
           clockInTime = now;
@@ -302,6 +431,7 @@ class _HomePageState extends State<HomePage> {
           'clockOut': now.toIso8601String(),
           'fotoClockOut': imageUrl,
           'fotoClockOutPublicId': publicId,
+          'locationName': locationName,
         });
         showCustomSnackBar(context, 'Berhasil Clock Out');
       }
@@ -315,12 +445,18 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  void ShowCustomSnackBar(BuildContext context, String massage, {bool isError = false}) {
+  void ShowCustomSnackBar(
+    BuildContext context,
+    String massage, {
+    bool isError = false,
+  }) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-      content: Text(massage),
-      backgroundColor: isError ? const Color.fromRGBO(68, 88, 99, 1) : Colors.green,
-      behavior: SnackBarBehavior.floating,
+        content: Text(massage),
+        backgroundColor: isError
+            ? const Color.fromRGBO(68, 88, 99, 1)
+            : Colors.green,
+        behavior: SnackBarBehavior.floating,
       ),
     );
   }
@@ -343,10 +479,7 @@ class _HomePageState extends State<HomePage> {
                 background: Container(
                   decoration: const BoxDecoration(
                     gradient: LinearGradient(
-                      colors: [
-                        Color(0xFF00A0E3),
-                        Color.fromARGB(255, 132, 220, 231),
-                      ],
+                      colors: [Color(0xFF00BCD4), Color(0xFF00ACC1)],
                       begin: Alignment.topCenter,
                       end: Alignment.bottomCenter,
                     ),
@@ -354,7 +487,7 @@ class _HomePageState extends State<HomePage> {
                   child: Padding(
                     padding: const EdgeInsets.symmetric(
                       horizontal: 20,
-                      vertical: 10,
+                      vertical: 30,
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -398,9 +531,22 @@ class _HomePageState extends State<HomePage> {
                                   _loadProfileData();
                                 });
                               },
-                              child: ProfileAvatar(
-                                profilePictureUrl: _profilePictureUrl,
-                                name: username,
+                              child: CircleAvatar(
+                                radius: 42,
+                                backgroundColor: Colors.grey.shade200,
+                                backgroundImage: _profilePictureUrl.isNotEmpty
+                                    ? NetworkImage(_profilePictureUrl)
+                                    : null,
+                                child: _profilePictureUrl.isEmpty
+                                    ? Text(
+                                        username,
+                                        style: GoogleFonts.poppins(
+                                          fontSize: 36,
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.grey.shade600,
+                                        ),
+                                      )
+                                    : null,
                               ),
                             ),
                           ],
@@ -415,9 +561,7 @@ class _HomePageState extends State<HomePage> {
               floating: true,
             ),
             if (_isProfileInComplete)
-              SliverToBoxAdapter(
-                child: ProfileCompletionNotification(),
-              ),
+              SliverToBoxAdapter(child: ProfileCompletionNotification()),
             SliverList(
               delegate: SliverChildListDelegate([
                 _buildInfoCard(),
@@ -537,8 +681,9 @@ class _HomePageState extends State<HomePage> {
                       color: const Color(0xFF4CAF50),
                     ),
                     StatusInfo(
-                      label: "Terlambat",
-                      count: "${monthlySummary['terlambat']} Hari",
+                      label: "Izin", // PERBAIKAN: Mengubah label
+                      count:
+                          "${monthlySummary['izin']} Hari", // PERBAIKAN: Mengambil dari key 'izin'
                       color: const Color(0xFFFF9800),
                     ),
                     StatusInfo(
@@ -566,8 +711,9 @@ class _HomePageState extends State<HomePage> {
       child: MaterialButton(
         padding: const EdgeInsets.symmetric(vertical: 16),
         onPressed: () {
-          final isAllowed = _mapKey.currentState?.userIsWithinRadius() ?? false;
-          if (isAllowed) {
+          final isActiveOfficeAvailable =
+              _mapKey.currentState?.activeOfficeName != null;
+          if (isActiveOfficeAvailable) {
             _ambilFotoDanUpload();
           } else {
             showCustomSnackBar(

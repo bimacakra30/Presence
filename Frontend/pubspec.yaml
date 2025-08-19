@@ -53,6 +53,7 @@ dependencies:
   geolocator: ^14.0.2
   table_calendar: any
   flutter_launcher_icons: any
+  connectivity_plus: ^6.1.5
 
 flutter_icons:
   android: true
