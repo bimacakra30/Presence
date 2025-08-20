@@ -283,14 +283,6 @@ class EmployeeResource extends Resource
                         default => ucfirst($state),
                     }),
 
-                Tables\Columns\IconColumn::make('firestore_synced')
-                    ->label('Firestore')
-                    ->boolean()
-                    ->tooltip(fn ($record): string => $record->firestore_id ? 
-                        'Synced with Firestore ID: ' . $record->firestore_id : 
-                        'Not synced with Firestore')
-                    ->getStateUsing(fn ($record): bool => !empty($record->firestore_id)),
-
                 Tables\Columns\TextColumn::make('created_at')
                     ->label('Created At')
                     ->dateTime()

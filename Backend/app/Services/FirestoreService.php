@@ -167,7 +167,7 @@ class FirestoreService
     }
 
     /**
-     * Clear cache untuk force refresh - Fixed version
+     * Clear cache untuk force refresh - Fixed version with recursion prevention
      */
     public function clearUsersCache()
     {
@@ -175,6 +175,14 @@ class FirestoreService
         Cache::forget('firestore_employees_list');
         Cache::forget('firestore_employees_count');
         
+        // Use a static flag to prevent recursion
+        static $isClearing = false;
+        if ($isClearing) {
+            Log::warning('Prevented recursive call to clearUsersCache');
+            return;
+        }
+        
+        $isClearing = true;
         try {
             // Check cache store type
             $cacheStore = Cache::getStore();
@@ -197,17 +205,8 @@ class FirestoreService
             }
         } catch (\Exception $e) {
             Log::info('Could not clear individual employee caches: ' . $e->getMessage());
-            
-            // Final fallback - clear tracked keys if they exist
-            try {
-                $trackedKeys = Cache::get('firestore_tracked_keys', []);
-                foreach ($trackedKeys as $key) {
-                    Cache::forget($key);
-                }
-                Cache::forget('firestore_tracked_keys');
-            } catch (\Exception $fallbackError) {
-                Log::error('Cache clearing fallback also failed: ' . $fallbackError->getMessage());
-            }
+        } finally {
+            $isClearing = false;
         }
     }
 
