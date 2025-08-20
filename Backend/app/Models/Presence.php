@@ -31,6 +31,7 @@ class Presence extends Model
     {
         static::deleted(function ($presence) {
             // Firestore deletion
+            Log::debug("Memulai penghapusan Presence ID: {$presence->id}, Firestore ID: {$presence->firestore_id}");
             if ($presence->firestore_id) {
                 try {
                     $service = new \App\Services\FirestoreService();

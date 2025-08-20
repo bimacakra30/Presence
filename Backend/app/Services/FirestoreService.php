@@ -3,10 +3,13 @@
 namespace App\Services;
 
 use Google\Cloud\Firestore\FirestoreClient;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Log;
 
 class FirestoreService
 {
     protected $db;
+    protected $cacheTimeout = 30; // Cache selama 30 detik untuk realtime experience
 
     public function __construct()
     {
@@ -21,35 +24,238 @@ class FirestoreService
         return $this->db->collection('employees');
     }
 
+    /**
+     * Cache key tracking for non-Redis cache stores
+     */
+    protected function addToTrackedKeys($key)
+    {
+        $trackedKeys = Cache::get('firestore_tracked_keys', []);
+        if (!in_array($key, $trackedKeys)) {
+            $trackedKeys[] = $key;
+            Cache::put('firestore_tracked_keys', $trackedKeys, now()->addHours(24));
+        }
+    }
 
+    /**
+     * Create user - compatible dengan existing method signature
+     */
     public function createUser($id, $data)
     {
         $collection = $this->db->collection('employees');
-        $collection->document((string)$id)->set($data);
+        
+        if (is_array($id)) {
+            // Jika $id adalah data (untuk auto-generate ID)
+            $docRef = $collection->add($id);
+            $this->clearUsersCache();
+            return $docRef->id();
+        } else {
+            // Jika $id adalah string (untuk specific ID)
+            $result = $collection->document((string)$id)->set($data);
+            $this->clearUsersCache();
+            return $result;
+        }
     }
 
     public function updateUser($id, $data)
     {
         $collection = $this->db->collection('employees');
-        $collection->document((string)$id)->set($data, ['merge' => true]);
+        $result = $collection->document((string)$id)->set($data, ['merge' => true]);
+        
+        // Clear cache setelah update
+        $this->clearUsersCache();
+        
+        return $result;
     }
 
     public function deleteUser($id)
     {
         $collection = $this->db->collection('employees');
-        $collection->document((string)$id)->delete();
+        $result = $collection->document((string)$id)->delete();
+        
+        // Clear cache setelah delete
+        $this->clearUsersCache();
+        
+        return $result;
     }
 
-    public function getUsers()
+    /**
+     * Get users with caching for better performance
+     */
+    public function getUsers($useCache = true)
     {
+        $cacheKey = 'firestore_employees_list';
+        
+        if ($useCache && Cache::has($cacheKey)) {
+            return Cache::get($cacheKey);
+        }
+
         $collection = $this->db->collection('employees');
-        $documents = $collection->documents();
+        
+        // Order by createdAt untuk konsistensi
+        $documents = $collection->orderBy('createdAt', 'DESC')->documents();
 
         $users = [];
         foreach ($documents as $document) {
             if ($document->exists()) {
                 $data = $document->data();
                 $data['id'] = $document->id();
+                
+                // Pastikan field yang diperlukan ada
+                $data = $this->normalizeUserData($data);
+                $users[] = $data;
+            }
+        }
+
+        // Cache hasil untuk performa yang lebih baik
+        if ($useCache) {
+            Cache::put($cacheKey, $users, now()->addSeconds($this->cacheTimeout));
+        }
+
+        return $users;
+    }
+
+    /**
+     * Get specific user by ID
+     */
+    public function getUser($id)
+    {
+        $cacheKey = "firestore_employee_{$id}";
+        
+        if (Cache::has($cacheKey)) {
+            return Cache::get($cacheKey);
+        }
+
+        $collection = $this->db->collection('employees');
+        $document = $collection->document((string)$id)->snapshot();
+
+        if ($document->exists()) {
+            $data = $document->data();
+            $data['id'] = $document->id();
+            $data = $this->normalizeUserData($data);
+            
+            // Cache individual user and track the key
+            Cache::put($cacheKey, $data, now()->addSeconds($this->cacheTimeout));
+            $this->addToTrackedKeys($cacheKey);
+            
+            return $data;
+        }
+
+        return null;
+    }
+
+    /**
+     * Normalize data dari Firestore untuk konsistensi
+     */
+    protected function normalizeUserData($data)
+    {
+        return [
+            'id' => $data['id'] ?? null,
+            'uid' => $data['uid'] ?? null,
+            'name' => $data['name'] ?? '',
+            'username' => $data['username'] ?? '',
+            'email' => $data['email'] ?? '',
+            'phone' => $data['phone'] ?? null,
+            'address' => $data['address'] ?? null,
+            'dateOfBirth' => $data['dateOfBirth'] ?? null,
+            'position' => $data['position'] ?? '',
+            'status' => $data['status'] ?? 'aktif',
+            'provider' => $data['provider'] ?? 'google',
+            'profilePictureUrl' => $data['profilePictureUrl'] ?? null,
+            'createdAt' => $data['createdAt'] ?? null,
+            'updatedAt' => $data['updatedAt'] ?? null,
+        ];
+    }
+
+    /**
+     * Clear cache untuk force refresh - Fixed version
+     */
+    public function clearUsersCache()
+    {
+        // Clear main caches
+        Cache::forget('firestore_employees_list');
+        Cache::forget('firestore_employees_count');
+        
+        try {
+            // Check cache store type
+            $cacheStore = Cache::getStore();
+            
+            if (method_exists($cacheStore, 'getRedis')) {
+                // Redis cache - use pattern matching
+                $redis = $cacheStore->getRedis();
+                $keys = $redis->keys('*firestore_employee_*');
+                if ($keys && count($keys) > 0) {
+                    $redis->del($keys);
+                }
+            } else {
+                // Non-Redis cache - use tracked keys approach
+                $trackedKeys = Cache::get('firestore_tracked_keys', []);
+                foreach ($trackedKeys as $key) {
+                    Cache::forget($key);
+                }
+                // Clear the tracking list
+                Cache::forget('firestore_tracked_keys');
+            }
+        } catch (\Exception $e) {
+            Log::info('Could not clear individual employee caches: ' . $e->getMessage());
+            
+            // Final fallback - clear tracked keys if they exist
+            try {
+                $trackedKeys = Cache::get('firestore_tracked_keys', []);
+                foreach ($trackedKeys as $key) {
+                    Cache::forget($key);
+                }
+                Cache::forget('firestore_tracked_keys');
+            } catch (\Exception $fallbackError) {
+                Log::error('Cache clearing fallback also failed: ' . $fallbackError->getMessage());
+            }
+        }
+    }
+
+    /**
+     * Get users count untuk navigation badge
+     */
+    public function getUsersCount()
+    {
+        $cacheKey = 'firestore_employees_count';
+        
+        if (Cache::has($cacheKey)) {
+            return Cache::get($cacheKey);
+        }
+
+        try {
+            $collection = $this->db->collection('employees');
+            $documents = $collection->documents();
+            
+            $count = 0;
+            foreach ($documents as $document) {
+                if ($document->exists()) {
+                    $count++;
+                }
+            }
+            
+            Cache::put($cacheKey, $count, now()->addSeconds($this->cacheTimeout));
+            return $count;
+            
+        } catch (\Exception $e) {
+            Log::error('Failed to get users count from Firestore: ' . $e->getMessage());
+            return 0;
+        }
+    }
+
+    /**
+     * Search users by specific field
+     */
+    public function searchUsers($field, $value)
+    {
+        $collection = $this->db->collection('employees');
+        $documents = $collection->where($field, '==', $value)->documents();
+
+        $users = [];
+        foreach ($documents as $document) {
+            if ($document->exists()) {
+                $data = $document->data();
+                $data['id'] = $document->id();
+                $data = $this->normalizeUserData($data);
                 $users[] = $data;
             }
         }
@@ -57,6 +263,82 @@ class FirestoreService
         return $users;
     }
 
+    /**
+     * Sync single employee from Firestore by UID - Minimal version
+     */
+    public function syncEmployeeByUid($uid)
+    {
+        try {
+            $firestoreUsers = $this->searchUsers('uid', $uid);
+            
+            if (empty($firestoreUsers)) {
+                throw new \Exception("Employee with UID {$uid} not found in Firestore");
+            }
+
+            $firestoreUser = $firestoreUsers[0];
+            $employee = \App\Models\Employee::where('uid', $uid)->first();
+
+            if ($employee) {
+                // Update existing - hanya field yang bisa diupdate
+                $updateData = [];
+                if (isset($firestoreUser['position'])) $updateData['position'] = $firestoreUser['position'];
+                if (isset($firestoreUser['status'])) $updateData['status'] = $firestoreUser['status'];
+                if (isset($firestoreUser['profilePictureUrl'])) $updateData['photo'] = $firestoreUser['profilePictureUrl'];
+                
+                if (!empty($updateData)) {
+                    $employee->updateQuietly($updateData);
+                    return ['action' => 'updated', 'employee' => $employee];
+                }
+                
+                return ['action' => 'no_change', 'employee' => $employee];
+            }
+
+            return ['action' => 'not_found', 'uid' => $uid];
+        } catch (\Exception $e) {
+            Log::error("Failed to sync employee by UID {$uid}: " . $e->getMessage());
+            throw $e;
+        }
+    }
+
+    /**
+     * Sync all employees from Firestore - Minimal version
+     */
+    public function syncAllEmployees()
+    {
+        $firestoreUsers = $this->getUsers(false);
+        
+        $synced = 0;
+        $updated = 0;
+        $errors = [];
+
+        foreach ($firestoreUsers as $firestoreUser) {
+            try {
+                if (!isset($firestoreUser['uid'])) continue;
+                
+                $result = $this->syncEmployeeByUid($firestoreUser['uid']);
+                
+                if ($result['action'] === 'updated') {
+                    $updated++;
+                }
+                $synced++;
+                
+            } catch (\Exception $e) {
+                $errors[] = [
+                    'user' => $firestoreUser['email'] ?? 'Unknown',
+                    'error' => $e->getMessage()
+                ];
+            }
+        }
+
+        return [
+            'synced' => $synced,
+            'updated' => $updated,
+            'created' => 0, // Tidak create otomatis di minimal version
+            'errors' => $errors
+        ];
+    }
+
+    // Keep all existing methods for backward compatibility...
     public function getAbsensi()
     {
         $collection = $this->db->collection('presence')->documents();
@@ -65,8 +347,6 @@ class FirestoreService
         foreach ($collection as $document) {
             if ($document->exists()) {
                 $data = $document->data();
-
-                // Pastikan kita tidak menimpa key penting dan menambahkan ID dokumen
                 $absensi[] = array_merge($data, [
                     'firestore_id' => $document->id(),
                 ]);
@@ -76,20 +356,16 @@ class FirestoreService
         return $absensi;
     }
 
-
-
-     public function deleteAbsensi($documentId)
+    public function deleteAbsensi($documentId)
     {
         $collection = $this->db->collection('presence');
         $collection->document($documentId)->delete();
     }
 
-
     public function getCollectionPosition()
     {
         return $this->db->collection('employee_positions');
     }
-
 
     public function createUserPosition($id, $data)
     {
@@ -127,34 +403,34 @@ class FirestoreService
     }
 
     public function getPerizinan($limit = 100, $lastDocument = null)
-{
-    $query = $this->db->collection('permits')->limit($limit);
-    
-    if ($lastDocument) {
-        $query = $query->startAfter($lastDocument);
-    }
-
-    $documents = $query->documents();
-    $absensi = [];
-    $lastDoc = null;
-
-    foreach ($documents as $document) {
-        if ($document->exists()) {
-            $data = $document->data();
-            $absensi[] = array_merge($data, [
-                'firestore_id' => $document->id(),
-            ]);
-            $lastDoc = $document; // Keep track of the last document for pagination
+    {
+        $query = $this->db->collection('permits')->limit($limit);
+        
+        if ($lastDocument) {
+            $query = $query->startAfter($lastDocument);
         }
+
+        $documents = $query->documents();
+        $absensi = [];
+        $lastDoc = null;
+
+        foreach ($documents as $document) {
+            if ($document->exists()) {
+                $data = $document->data();
+                $absensi[] = array_merge($data, [
+                    'firestore_id' => $document->id(),
+                ]);
+                $lastDoc = $document;
+            }
+        }
+
+        return [
+            'data' => $absensi,
+            'lastDocument' => $lastDoc,
+        ];
     }
 
-    return [
-        'data' => $absensi,
-        'lastDocument' => $lastDoc,
-    ];
-}
-
-     public function deletePerizinan($documentId)
+    public function deletePerizinan($documentId)
     {
         $collection = $this->db->collection('permits');
         $collection->document($documentId)->delete();
@@ -171,7 +447,6 @@ class FirestoreService
         return $this->db->collection('geo_locator');
     }
 
-
     public function createMaps($collectionName, $id, array $data)
     {
         $collection = $this->db->collection($collectionName);
@@ -183,7 +458,6 @@ class FirestoreService
         $collection = $this->db->collection($collectionName);
         $collection->document((string)$id)->delete();
     }
-
 
     public function updateMaps($collectionName, $id, array $data)
     {
@@ -207,5 +481,4 @@ class FirestoreService
 
         return $users;
     }
-
 }

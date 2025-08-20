@@ -57,13 +57,13 @@ class Employee extends Model
 
             $data = [
                 'uid' => $employee->uid,
-                'ProfilePictureUrl' =>$employee->photo,
+                'profilePictureUrl' =>$employee->photo,
                 'name' => $employee->name,
                 'username' => $employee->username,
                 'email' => $employee->email,
                 'password' => $employee->password,
                 'address' => $employee->address,
-                'date_of_birth' => $employee->date_of_birth,
+                'dateOfBirth' => $employee->date_of_birth,
                 'position' => $employee->position,
                 'status' => $employee->status,
                 'provider' => $employee->provider,

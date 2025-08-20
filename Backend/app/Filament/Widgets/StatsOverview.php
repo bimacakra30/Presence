@@ -6,6 +6,7 @@ use Filament\Widgets\StatsOverviewWidget\Card;
 use App\Models\Employee;
 use App\Models\Presence;
 use App\Models\Project;
+use App\Models\Permit;
 use App\Models\User;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
@@ -66,12 +67,12 @@ class StatsOverview extends \Filament\Widgets\StatsOverviewWidget
             ->chart($chartData)
             ->url(route('filament.admin.resources.presences.index'));
 
-        $cards[] = Card::make('Proyek Aktif', Project::where('status', 'aktif')->count())
-            ->description('Proyek yang masih berjalan')
-            ->descriptionIcon('heroicon-m-folder-open')
-            ->icon('heroicon-o-folder')
+        $cards[] = Card::make('Perizinan', Permit::count())
+            ->description('Perizinan Hari Ini')
+            ->descriptionIcon('heroicon-m-envelope')
+            ->icon('heroicon-o-envelope')
             ->color('info')
-            ->url(route('filament.admin.resources.projects.index'));
+            ->url(route('filament.admin.resources.permits.index'));
 
         return $cards;
     }

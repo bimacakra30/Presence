@@ -101,6 +101,7 @@ class ListPresences extends ListRecords
         return [
             DeleteAction::make()
             ->before(function (Presence $record) {
+                Log::debug("Memulai DeleteAction untuk Presence ID: {$record->id}");
                 // Konfigurasi Cloudinary manual (sesuai env)
                 Configuration::instance([
                     'cloud' => [
