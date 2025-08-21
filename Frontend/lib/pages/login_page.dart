@@ -105,6 +105,25 @@ class _LoginPageState extends State<LoginPage> {
       final userDoc = query.docs.first;
       final userEmail = userDoc['email'];
 
+      final userStatus = userDoc['status'] as String? ?? 'aktif';
+      if (userStatus.toLowerCase() == 'non active') {
+        debugPrint(
+          'Akun dengan username $username tidak aktif, Login di blokir',
+        );
+        if (!mounted) return;
+        if (Navigator.canPop(context)) Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              "Akun Anda berstatus non-aktif. Silakan hubungi administrator.",
+            ),
+            backgroundColor: Colors.red,
+          ),
+        );
+        setState(() => isLoading = false);
+        return;
+      }
+
       debugPrint('Mencoba login Firebase Auth dengan email: $userEmail');
       final userCredential = await FirebaseAuth.instance
           .signInWithEmailAndPassword(email: userEmail, password: password);
@@ -403,6 +422,26 @@ class _LoginPageState extends State<LoginPage> {
         return;
       }
       debugPrint('Data Firestore final untuk Google user: $dataToSave');
+
+      final userStatus = dataToSave['status'] as String? ?? 'active';
+      if (userStatus.toLowerCase() == 'non active') {
+        debugPrint(
+          'Pengguna Google ${firebaseUser.email} berstatus non-aktif. Login diblokir.',
+        );
+        if (!mounted) return;
+        if (Navigator.canPop(context)) Navigator.pop(context);
+        // Also sign out from Firebase Auth to prevent half-logged-in state
+        await FirebaseAuth.instance.signOut();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              "Akun Anda berstatus non-aktif. Silakan hubungi administrator.",
+            ),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return;
+      }
 
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('name', dataToSave['name'] ?? 'Unknown');
