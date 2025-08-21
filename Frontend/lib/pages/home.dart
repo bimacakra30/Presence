@@ -461,6 +461,16 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
+  String _getInitials(String name) {
+    if (name.isEmpty) return '';
+    List<String> parts = name.trim().split(' ');
+    if (parts.length >= 2) {
+      return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
+    } else {
+      return name[0].toUpperCase();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     // Mengatur warna ikon status bar agar terlihat jelas
@@ -539,7 +549,7 @@ class _HomePageState extends State<HomePage> {
                                     : null,
                                 child: _profilePictureUrl.isEmpty
                                     ? Text(
-                                        username,
+                                        _getInitials(username),
                                         style: GoogleFonts.poppins(
                                           fontSize: 36,
                                           fontWeight: FontWeight.bold,
