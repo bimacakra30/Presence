@@ -23,12 +23,35 @@
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
+            <intent-filter>
+                <action android:name="FLUTTER_NOTIFICATION_CLICK" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
         </activity>
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
+
+        <!-- NEW: Default Notification Channel untuk Firebase Messaging (Penting untuk Android 8.0+) -->
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_channel_id"
+            android:value="presensi_channel" />
+        <!-- Pastikan ID channel ini (presensi_channel) sesuai dengan yang Anda gunakan di LocalNotificationService.dart -->
+
+        <!-- Opsional: Default Notification Icon (Jika ingin ikon notifikasi yang berbeda dari ikon aplikasi) -->
+        <!-- Anda perlu membuat aset drawable di res/drawable/ic_notification.xml atau sejenisnya -->
+        <!-- <meta-data
+            android:name="com.google.firebase.messaging.default_notification_icon"
+            android:resource="@drawable/ic_notification" /> -->
+
+        <!-- Opsional: Default Notification Color (Jika ingin warna notifikasi tertentu) -->
+        <!-- Anda perlu mendefinisikan @color/notification_color di res/values/colors.xml -->
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_color"
+            android:resource="@color/notification_color" />
+
     </application>
 
     <!-- permission app -->
@@ -38,6 +61,8 @@
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
     <uses-permission android:name="android.permission.INTERNET"/>
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
+    <!-- Tambahan izin untuk FCM jika diperlukan oleh versi Android atau plugin tertentu -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/> <!-- Untuk Android 13+ -->
 
     <!-- Required to query activities that can process text, see:
          https://developer.android.com/training/package-visibility and
