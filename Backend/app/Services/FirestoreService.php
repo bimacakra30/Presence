@@ -280,8 +280,12 @@ class FirestoreService
             if ($employee) {
                 // Update existing - hanya field yang bisa diupdate
                 $updateData = [];
-                if (isset($firestoreUser['position'])) $updateData['position'] = $firestoreUser['position'];
+                if (isset($firestoreUser['name'])) $updateData['name'] = $firestoreUser['name'];
+                if (isset($firestoreUser['address'])) $updateData['address'] = $firestoreUser['address'];
+                if (isset($firestoreUser['username'])) $updateData['username'] = $firestoreUser['username'];
+                if (isset($firestoreUser['provider'])) $updateData['provider'] = $firestoreUser['provider'];
                 if (isset($firestoreUser['status'])) $updateData['status'] = $firestoreUser['status'];
+                if (isset($firestoreUser['position'])) $updateData['position'] = $firestoreUser['position'];
                 if (isset($firestoreUser['profilePictureUrl'])) $updateData['photo'] = $firestoreUser['profilePictureUrl'];
                 
                 if (!empty($updateData)) {
