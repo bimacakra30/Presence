@@ -23,6 +23,7 @@ class _ProfileDetailPageState extends State<ProfileDetailPage>
   String _createdAt = '';
   String _address = '';
   String _dateOfBirth = '';
+  String _phone = '';
 
   bool _isLoading = true;
   late AnimationController _animationController;
@@ -80,6 +81,7 @@ class _ProfileDetailPageState extends State<ProfileDetailPage>
       _provider = prefs.getString('provider') ?? '';
       _address = prefs.getString('address') ?? '';
       _dateOfBirth = prefs.getString('dateOfBirth') ?? '';
+      _phone = prefs.getString('phone') ?? '';
 
       String? createdAtString = prefs.getString('createdAt');
       if (createdAtString != null && createdAtString.isNotEmpty) {
@@ -320,6 +322,15 @@ class _ProfileDetailPageState extends State<ProfileDetailPage>
                                   ? _email
                                   : 'Tidak tersedia',
                               isClickable: _email.isNotEmpty,
+                            ),
+                            const SizedBox(height: 12),
+                            _buildInfoCard(
+                              icon: Icons.phone_rounded,
+                              title: 'Telepon',
+                              value: _phone.isNotEmpty
+                                  ? _phone
+                                  : 'Tidak tersedia',
+                              isClickable: _phone.isNotEmpty,
                             ),
                             const SizedBox(height: 12),
                             _buildInfoCard(

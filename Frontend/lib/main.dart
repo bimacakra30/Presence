@@ -10,6 +10,7 @@ import 'firebase_options.dart';
 import 'pages/login_page.dart';
 import 'pages/home.dart';
 import 'services/local_notification_service.dart'; // Import service notifikasi lokal
+import 'utils/fcm_token_manager.dart';
 
 // Fungsi top-level untuk menangani pesan latar belakang FCM
 // Ini harus dideklarasikan di luar kelas dan tidak boleh anonim atau async
@@ -61,6 +62,11 @@ class _MyAppState extends State<MyApp> {
   @override
   void initState() {
     super.initState();
+
+    FirebaseAuth.instance.authStateChanges().listen((User? user) {
+      // Call function untuk save/update token FCM saat user login
+      saveEmployeeFcmTokenToFirestore();
+    });
 
     // Listener untuk notifikasi saat aplikasi di foreground (sedang dibuka dan aktif)
     FirebaseMessaging.onMessage.listen((RemoteMessage message) {

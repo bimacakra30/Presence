@@ -4,7 +4,7 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import '../utils/notification_utils.dart'; // Ensure this path is correct
+import '../utils/notification_utils.dart'; // Pastikan path ini benar
 
 // Data model for Office Location
 class OfficeLocationConfig {
@@ -24,11 +24,19 @@ class OfficeLocationConfig {
 
   factory OfficeLocationConfig.fromDocument(DocumentSnapshot doc) {
     final data = doc.data() as Map<String, dynamic>;
-    final latitude =
-        double.tryParse(data['latitude'] as String? ?? '0.0') ?? 0.0;
-    final longitude =
-        double.tryParse(data['longitude'] as String? ?? '0.0') ?? 0.0;
-    final radius = double.tryParse(data['radius'] as String? ?? '0.0') ?? 0.0;
+
+    // Perbaikan: Ambil nilai langsung sebagai double, bukan mencoba parsing dari String
+    // Jika di Firestore tersimpan sebagai int atau double, ini akan langsung berhasil.
+    // Jika masih string, double.tryParse akan menanganinya.
+    final latitude = (data['latitude'] is num)
+        ? (data['latitude'] as num).toDouble()
+        : double.tryParse(data['latitude']?.toString() ?? '0.0') ?? 0.0;
+    final longitude = (data['longitude'] is num)
+        ? (data['longitude'] as num).toDouble()
+        : double.tryParse(data['longitude']?.toString() ?? '0.0') ?? 0.0;
+    final radius = (data['radius'] is num)
+        ? (data['radius'] as num).toDouble()
+        : double.tryParse(data['radius']?.toString() ?? '0.0') ?? 0.0;
 
     return OfficeLocationConfig(
       id: doc.id,
@@ -49,16 +57,15 @@ class MapLocationWidget extends StatefulWidget {
 
 class MapLocationWidgetState extends State<MapLocationWidget> {
   LatLng? _currentPosition;
-  List<OfficeLocationConfig> _availableOffices =
-      []; // List of all available offices
-  String?
-  _activeOfficeName; // Stores the name of the office the user is currently in (if any)
+  List<OfficeLocationConfig> _availableOffices = []; // List of all available offices
+  String? _activeOfficeName; // Stores the name of the office the user is currently in (if any)
+  bool _isMockLocationDetected = false; // <--- BARU: Status deteksi Fake GPS
+  double? _locationAccuracy; // <--- BARU: Akurasi lokasi
 
   // NEW: Public getter for _activeOfficeName
   String? get activeOfficeName => _activeOfficeName;
 
   late Future<bool> _permissionAndLocationFuture;
-  // `isWithinRadius` property is now handled by the `userIsWithinRadius()` getter
 
   @override
   void initState() {
@@ -117,6 +124,8 @@ class MapLocationWidgetState extends State<MapLocationWidget> {
       setState(() {
         _currentPosition = null;
         _activeOfficeName = null; // Reset active office name
+        _isMockLocationDetected = false; // <--- BARU: Reset status Fake GPS
+        _locationAccuracy = null; // <--- BARU: Reset akurasi
       });
     }
 
@@ -185,9 +194,31 @@ class MapLocationWidgetState extends State<MapLocationWidget> {
       );
       if (!mounted) return false;
 
+      // <--- BARU: Deteksi Fake GPS
+      final isMock = position.isMocked;
+      final accuracy = position.accuracy;
+
+      if (mounted) {
+        setState(() {
+          _isMockLocationDetected = isMock;
+          _locationAccuracy = accuracy;
+        });
+      }
+
+      if (isMock) {
+        if (mounted) {
+          showCustomSnackBar(
+            context,
+            '⛔ Terdeteksi Lokasi Palsu (Mock Location)! Presensi diblokir.',
+            isError: true,
+          );
+        }
+        return false; // Blokir presensi jika lokasi palsu terdeteksi
+      }
+      // Akhir deteksi Fake GPS --->
+
       final currentLatLng = LatLng(position.latitude, position.longitude);
-      String?
-      foundOfficeName; // To store the name of the office if found within radius
+      String? foundOfficeName; // To store the name of the office if found within radius
 
       // NEW LOGIC: Check distance against ALL available offices
       for (var office in _availableOffices) {
@@ -210,22 +241,20 @@ class MapLocationWidgetState extends State<MapLocationWidget> {
       if (mounted) {
         setState(() {
           _currentPosition = currentLatLng;
-          _activeOfficeName =
-              foundOfficeName; // Set the name of the active office
-          // `isWithinRadius` is now derived from _activeOfficeName != null via userIsWithinRadius() getter
+          _activeOfficeName = foundOfficeName; // Set the name of the active office
         });
       }
 
       if (!mounted) return userIsWithinRadius(); // Check the getter
       if (!userIsWithinRadius()) {
-        // User is not in any office, check the getter
+        // User is not in any office
         showCustomSnackBar(
           context,
           '🔴 Kamu berada di luar area presensi manapun.',
           isError: true,
         );
       } else {
-        // User is in an office, check the getter
+        // User is in an office
         showCustomSnackBar(
           context,
           '🟢 Kamu berada di area presensi $_activeOfficeName.',
@@ -246,6 +275,8 @@ class MapLocationWidgetState extends State<MapLocationWidget> {
         setState(() {
           _currentPosition = null;
           _activeOfficeName = null; // Reset
+          _isMockLocationDetected = false; // Reset
+          _locationAccuracy = null; // Reset
         });
       }
       return false;
@@ -260,8 +291,8 @@ class MapLocationWidgetState extends State<MapLocationWidget> {
     }
   }
 
-  // This getter now correctly reflects if _activeOfficeName is not null
-  bool userIsWithinRadius() => _activeOfficeName != null;
+  // This getter now correctly reflects if _activeOfficeName is not null AND no mock location
+  bool userIsWithinRadius() => _activeOfficeName != null && !_isMockLocationDetected;
 
   @override
   Widget build(BuildContext context) {
@@ -302,7 +333,7 @@ class MapLocationWidgetState extends State<MapLocationWidget> {
                             Icons.business_center,
                             size: 50,
                             color: Colors.orange.shade600,
-                          ), // Fixed: Changed to valid icon and correct shade access
+                          ),
                           const SizedBox(height: 10),
                           const Text(
                             'Tidak ada data lokasi kantor yang tersedia di Firestore.',
@@ -379,7 +410,7 @@ class MapLocationWidgetState extends State<MapLocationWidget> {
                               radius: office.radius,
                               color: Colors.blue.withAlpha(
                                 (255 * 0.2).round(),
-                              ), // Fixed: Deprecated withOpacity
+                              ),
                               borderStrokeWidth: 2,
                               borderColor: Colors.blueAccent,
                             );
@@ -397,9 +428,11 @@ class MapLocationWidgetState extends State<MapLocationWidget> {
                                 Icons
                                     .person_pin_circle, // More specific icon for user
                                 size: 40,
-                                color: userIsWithinRadius()
-                                    ? Colors.green
-                                    : Colors.red, // Use the getter
+                                color: _isMockLocationDetected
+                                    ? Colors.orange // Marker orange jika fake GPS
+                                    : (userIsWithinRadius()
+                                        ? Colors.green
+                                        : Colors.red),
                               ),
                             ),
                             // Markers for each office
@@ -428,11 +461,10 @@ class MapLocationWidgetState extends State<MapLocationWidget> {
                       child: Container(
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
-                          color:
-                              (userIsWithinRadius() ? Colors.green : Colors.red)
-                                  .withAlpha(
-                                    (255 * 0.9).round(),
-                                  ), // Fixed: Deprecated withOpacity
+                          color: _isMockLocationDetected
+                              ? Colors.orange.withAlpha((255 * 0.9).round())
+                              : (userIsWithinRadius() ? Colors.green : Colors.red)
+                                  .withAlpha((255 * 0.9).round()),
                           borderRadius: BorderRadius.circular(12),
                           boxShadow: const [
                             BoxShadow(
@@ -443,9 +475,11 @@ class MapLocationWidgetState extends State<MapLocationWidget> {
                           ],
                         ),
                         child: Text(
-                          _activeOfficeName != null
-                              ? "🟢 Anda berada di area presensi $_activeOfficeName."
-                              : "🔴 Anda berada di luar area presensi manapun.",
+                          _isMockLocationDetected
+                              ? "⛔ Lokasi Palsu (Mock Location) terdeteksi!"
+                              : (_activeOfficeName != null
+                                  ? "🟢 Anda berada di area presensi $_activeOfficeName."
+                                  : "🔴 Anda berada di luar area presensi manapun."),
                           style: const TextStyle(
                             color: Colors.white,
                             fontWeight: FontWeight.bold,
@@ -454,6 +488,29 @@ class MapLocationWidgetState extends State<MapLocationWidget> {
                         ),
                       ),
                     ),
+                    // <--- BARU: Tampilkan akurasi lokasi
+                    if (_locationAccuracy != null)
+                      Positioned(
+                        bottom: 16,
+                        left: 16,
+                        right: 16,
+                        child: Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: Colors.black.withOpacity(0.7),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            'Akurasi GPS: ${_locationAccuracy!.toStringAsFixed(1)} meter',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 12,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                        ),
+                      ),
+                    // Akhir akurasi lokasi --->
                   ],
                 );
               },

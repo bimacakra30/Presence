@@ -62,6 +62,7 @@ class _HomePageState extends State<HomePage> {
     final email = prefs.getString('email');
     final firestoreUsername = prefs.getString('username');
     final dateOfBirth = prefs.getString('dateOfBirth');
+    final phone = prefs.getString('phone');
 
     if (name == null ||
         name.isEmpty ||
@@ -70,7 +71,9 @@ class _HomePageState extends State<HomePage> {
         firestoreUsername == null ||
         firestoreUsername.isEmpty ||
         dateOfBirth == null ||
-        dateOfBirth.isEmpty) {
+        dateOfBirth.isEmpty ||
+        phone == null ||
+        phone.isEmpty) {
       if (!mounted) return;
       setState(() {
         _isProfileInComplete = true;

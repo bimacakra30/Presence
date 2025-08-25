@@ -25,6 +25,7 @@ class _EditProfilePageState extends State<EditProfilePage>
   final TextEditingController _statusController = TextEditingController();
   final TextEditingController _addressController = TextEditingController();
   final TextEditingController _dateOfBirthController = TextEditingController();
+  final TextEditingController _phoneController = TextEditingController();
 
   final _picker = ImagePicker();
   late AnimationController _animationController;
@@ -63,6 +64,7 @@ class _EditProfilePageState extends State<EditProfilePage>
     _statusController.dispose();
     _addressController.dispose();
     _dateOfBirthController.dispose();
+    _phoneController.dispose();
     super.dispose();
   }
 
@@ -91,6 +93,7 @@ class _EditProfilePageState extends State<EditProfilePage>
           _positionController.text = data['position'] ?? '';
           _statusController.text = data['status'] ?? '';
           _addressController.text = data['address'] ?? '';
+          _phoneController.text = data['phone'] ?? '';
 
           if (data['dateOfBirth'] != null &&
               data['dateOfBirth'] is String &&
@@ -244,6 +247,7 @@ class _EditProfilePageState extends State<EditProfilePage>
     String? username,
     String? address,
     String? dateOfBirth,
+    String? phone,
   }) async {
     final prefs = await SharedPreferences.getInstance();
     if (name != null) {
@@ -260,6 +264,9 @@ class _EditProfilePageState extends State<EditProfilePage>
     }
     if (dateOfBirth != null) {
       await prefs.setString('dateOfBirth', dateOfBirth);
+    }
+    if (phone != null) {
+      await prefs.setString('phone', phone);
     }
   }
 
@@ -397,6 +404,7 @@ class _EditProfilePageState extends State<EditProfilePage>
     String? username,
     String? address,
     String? dateOfBirth,
+    String? phone,
   }) async {
     final user = FirebaseAuth.instance.currentUser;
     if (user != null && user.uid.isNotEmpty) {
@@ -411,6 +419,7 @@ class _EditProfilePageState extends State<EditProfilePage>
       if (username != null) updates['username'] = username;
       if (address != null) updates['address'] = address;
       if (dateOfBirth != null) updates['dateOfBirth'] = dateOfBirth;
+      if (phone != null) updates['phone'] = phone;
 
       if (!updates.containsKey('uid')) updates['uid'] = user.uid;
 
@@ -446,6 +455,7 @@ class _EditProfilePageState extends State<EditProfilePage>
         address: _addressController.text,
         dateOfBirth: _selectedDateOfBirth?.toIso8601String(),
         profilePictureUrl: _profilePictureUrl,
+        phone: _phoneController.text,
       );
 
       await _saveToPrefs(
@@ -454,6 +464,7 @@ class _EditProfilePageState extends State<EditProfilePage>
         address: _addressController.text,
         dateOfBirth: _selectedDateOfBirth?.toIso8601String(),
         profilePictureUrl: _profilePictureUrl,
+        phone: _phoneController.text,
       );
 
       if (!mounted) return;
@@ -721,6 +732,24 @@ class _EditProfilePageState extends State<EditProfilePage>
                               },
                             ),
                             const SizedBox(height: 20),
+
+                            _buildModernTextField( // <--- BARU: Input untuk Nomor Telepon
+                              controller: _phoneController,
+                              label: 'Nomor Telepon',
+                              icon: Icons.phone_rounded,
+                              keyboardType: TextInputType.phone,
+                              validator: (value) {
+                                if (value == null || value.isEmpty) {
+                                  return 'Nomor telepon tidak boleh kosong';
+                                }
+                                // Opsional: Tambahkan validasi format nomor telepon
+                                if (!RegExp(r'^\+?[0-9]{10,15}$').hasMatch(value)) {
+                                  return 'Masukkan nomor telepon yang valid';
+                                }
+                                return null;
+                              },
+                            ),
+                            const SizedBox(height: 20),
                             
                             _buildModernTextField(
                               controller: _dateOfBirthController,
@@ -949,6 +978,7 @@ class _EditProfilePageState extends State<EditProfilePage>
     bool readOnly = false,
     int maxLines = 1,
     VoidCallback? onTap,
+    TextInputType? keyboardType,
   }) {
     return Container(
       decoration: BoxDecoration(
@@ -968,6 +998,7 @@ class _EditProfilePageState extends State<EditProfilePage>
         readOnly: readOnly,
         maxLines: maxLines,
         onTap: onTap,
+        keyboardType: keyboardType,
         style: GoogleFonts.poppins(
           fontSize: 16,
           fontWeight: FontWeight.w500,

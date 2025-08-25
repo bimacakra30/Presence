@@ -7,6 +7,7 @@ import 'package:connectivity_plus/connectivity_plus.dart';
 import 'loading_page.dart';
 import 'home.dart';
 import 'package:Presence/components/dialog/forgot_password_dialog.dart';
+import 'package:Presence/utils/fcm_token_manager.dart';
 
 class LoginPage extends StatefulWidget {
   final String? notificationMessage;
@@ -203,6 +204,7 @@ class _LoginPageState extends State<LoginPage> {
       await prefs.setString('name', dataToSave['name'] ?? 'Unknown');
       await prefs.setString('email', dataToSave['email'] ?? '');
       await prefs.setString('username', dataToSave['username'] ?? '');
+      await prefs.setString('phone', dataToSave['phone'] ?? '');
       await prefs.setString(
         'profilePictureUrl',
         dataToSave['profilePictureUrl'] ?? '',
@@ -220,6 +222,8 @@ class _LoginPageState extends State<LoginPage> {
         'createdAt',
         dataToSave['createdAt'] ?? DateTime.now().toIso8601String(),
       );
+
+      await saveEmployeeFcmTokenToFirestore();
 
       debugPrint('Data disimpan ke SharedPreferences. Menuju HomePage.');
       await Future.delayed(const Duration(seconds: 1));
@@ -373,6 +377,7 @@ class _LoginPageState extends State<LoginPage> {
             'dateOfBirth': '',
             'provider': 'google',
             'createdAt': DateTime.now().toIso8601String(),
+            'phone': null,
           });
           debugPrint(
             'Membuat dokumen Firestore baru untuk UID: ${firebaseUser.uid}',
@@ -399,6 +404,9 @@ class _LoginPageState extends State<LoginPage> {
         }
         if (existingData['name'] != firebaseUser.displayName) {
           updates['name'] = firebaseUser.displayName;
+        }
+        if (!existingData.containsKey('phone') || existingData['phone'] == null) {
+          updates['phone'] = null; // Bisa diisi dengan data dari Google profile jika ada, tapi biasanya tidak ada no. HP
         }
         if (updates.isNotEmpty) {
           await employeeDocRef.update(updates);
@@ -447,6 +455,7 @@ class _LoginPageState extends State<LoginPage> {
       await prefs.setString('name', dataToSave['name'] ?? 'Unknown');
       await prefs.setString('email', dataToSave['email'] ?? '');
       await prefs.setString('username', dataToSave['username'] ?? '');
+      await prefs.setString('phone', dataToSave['phone'] ?? '');
       await prefs.setString(
         'profilePictureUrl',
         dataToSave['profilePictureUrl'] ?? '',
@@ -461,6 +470,8 @@ class _LoginPageState extends State<LoginPage> {
         'createdAt',
         dataToSave['createdAt'] ?? DateTime.now().toIso8601String(),
       );
+
+      await saveEmployeeFcmTokenToFirestore();
 
       debugPrint(
         'Data disimpan ke SharedPreferences untuk Google user. Menuju HomePage.',
