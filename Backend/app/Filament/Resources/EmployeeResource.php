@@ -354,42 +354,6 @@ class EmployeeResource extends Resource
                     ]),
 
                 Tables\Actions\EditAction::make(),
-
-                Tables\Actions\Action::make('sync_from_firestore')
-                    ->label('Sync from Firestore')
-                    ->icon('heroicon-o-arrow-down-on-square')
-                    ->color('info')
-                    ->visible(fn ($record): bool => !empty($record->uid))
-                    ->requiresConfirmation()
-                    ->modalHeading('Sync Employee from Firestore')
-                    ->modalDescription('This will update the local employee data with the latest data from Firestore.')
-                    ->action(function ($record) {
-                        try {
-                            $firestoreService = new FirestoreService();
-                            $result = $firestoreService->syncEmployeeByUid($record->uid);
-                            
-                            if ($result['action'] === 'updated') {
-                                Notification::make()
-                                    ->title('Successfully synced from Firestore')
-                                    ->body('Employee ' . $record->name . ' has been updated with Firestore data')
-                                    ->success()
-                                    ->send();
-                            } else {
-                                Notification::make()
-                                    ->title('No changes found')
-                                    ->body('Employee data is already up to date')
-                                    ->info()
-                                    ->send();
-                            }
-                        } catch (\Exception $e) {
-                            Notification::make()
-                                ->title('Failed to sync from Firestore')
-                                ->body($e->getMessage())
-                                ->danger()
-                                ->send();
-                        }
-                    }),
-
                 Tables\Actions\Action::make('manual_firestore_sync')
                     ->label('Force Sync to Firestore')
                     ->icon('heroicon-o-arrow-up-on-square')

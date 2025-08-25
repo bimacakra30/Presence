@@ -26,6 +26,7 @@ class Employee extends Model
         'status',
         'provider',
         'firestore_id',
+        'fcm_token',
     ];
 
     protected $hidden = [
@@ -67,6 +68,7 @@ class Employee extends Model
                 'name' => $employee->name,
                 'username' => $employee->username,
                 'email' => $employee->email,
+                'phone' => $employee->phone,
                 'password' => Hash::make($employee->plainPassword), // Hash password untuk Firestore
                 'address' => $employee->address,
                 'dateOfBirth' => $employee->date_of_birth,
