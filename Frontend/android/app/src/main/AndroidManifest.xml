@@ -2,7 +2,7 @@
     <application
         android:label="Presence."
         android:name="${applicationName}"
-        android:icon="@mipmap/ic_launcher">
+        android:icon="@mipmap/ic_launcher"> <!-- Ini adalah ikon utama aplikasi Anda -->
         <activity
             android:name=".MainActivity"
             android:exported="true"
@@ -11,10 +11,6 @@
             android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"
             android:hardwareAccelerated="true"
             android:windowSoftInputMode="adjustResize">
-            <!-- Specifies an Android theme to apply to this Activity as soon as
-                 the Android process has started. This theme is visible to the user
-                 while the Flutter UI initializes. After that, this theme continues
-                 to determine the Window background behind the Flutter UI. -->
             <meta-data
               android:name="io.flutter.embedding.android.NormalTheme"
               android:resource="@style/NormalTheme"
@@ -28,26 +24,25 @@
                 <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
         </activity>
-        <!-- Don't delete the meta-data below.
-             This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
 
-        <!-- NEW: Default Notification Channel untuk Firebase Messaging (Penting untuk Android 8.0+) -->
+        <!-- Default Notification Channel untuk Firebase Messaging (Penting untuk Android 8.0+) -->
         <meta-data
             android:name="com.google.firebase.messaging.default_notification_channel_id"
             android:value="presensi_channel" />
-        <!-- Pastikan ID channel ini (presensi_channel) sesuai dengan yang Anda gunakan di LocalNotificationService.dart -->
 
-        <!-- Opsional: Default Notification Icon (Jika ingin ikon notifikasi yang berbeda dari ikon aplikasi) -->
-        <!-- Anda perlu membuat aset drawable di res/drawable/ic_notification.xml atau sejenisnya -->
-        <!-- <meta-data
+        <!-- BARU: Default Notification Icon untuk FCM -->
+        <!-- Dengan mengomentari ini, sistem Android cenderung menggunakan android:icon dari <application>
+             sebagai ikon notifikasi default jika tidak ada ikon spesifik yang disetel -->
+        <!-- Jika Anda benar-benar ingin mengaturnya secara eksplisit ke launcher icon: -->
+        <meta-data
             android:name="com.google.firebase.messaging.default_notification_icon"
-            android:resource="@drawable/ic_notification" /> -->
+            android:resource="@mipmap/ic_launcher" />
 
-        <!-- Opsional: Default Notification Color (Jika ingin warna notifikasi tertentu) -->
-        <!-- Anda perlu mendefinisikan @color/notification_color di res/values/colors.xml -->
+
+        <!-- Default Notification Color -->
         <meta-data
             android:name="com.google.firebase.messaging.default_notification_color"
             android:resource="@color/notification_color" />
@@ -61,14 +56,7 @@
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
     <uses-permission android:name="android.permission.INTERNET"/>
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
-    <!-- Tambahan izin untuk FCM jika diperlukan oleh versi Android atau plugin tertentu -->
-    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/> <!-- Untuk Android 13+ -->
-
-    <!-- Required to query activities that can process text, see:
-         https://developer.android.com/training/package-visibility and
-         https://developer.android.com/reference/android/content/Intent#ACTION_PROCESS_TEXT.
-
-         In particular, this is used by the Flutter engine in io.flutter.plugin.text.ProcessTextPlugin. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
     <queries>
         <intent>
             <action android:name="android.intent.action.PROCESS_TEXT"/>

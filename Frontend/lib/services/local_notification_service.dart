@@ -7,8 +7,9 @@ class LocalNotificationService {
 
   // Inisialisasi pengaturan notifikasi
   static Future<void> initializeNotifications() async {
+    // Gunakan @mipmap/ic_launcher untuk ikon notifikasi saat inisialisasi
     const AndroidInitializationSettings initializationSettingsAndroid =
-        AndroidInitializationSettings('@mipmap/ic_launcher'); // Ikon aplikasi
+        AndroidInitializationSettings('@mipmap/ic_launcher');
 
     final DarwinInitializationSettings initializationSettingsDarwin =
         DarwinInitializationSettings(
@@ -48,7 +49,7 @@ class LocalNotificationService {
       importance: Importance.max,
       priority: Priority.high,
       showWhen: false,
-      icon: '@mipmap/ic_launcher', // Ikon notifikasi
+      icon: '@mipmap/ic_launcher', // <--- UBAH KE @mipmap/ic_launcher
     );
 
     const NotificationDetails platformChannelSpecifics =
@@ -64,12 +65,8 @@ class LocalNotificationService {
   }
 
   // Menampilkan notifikasi saat aplikasi di latar belakang (jika perlu)
-  // Perhatikan bahwa FCM secara otomatis menangani tampilan notifikasi dari payload 'notification'
-  // saat aplikasi di background/terminated. Fungsi ini berguna jika Anda ingin kustomisasi
-  // tampilan notifikasi dari data payload, atau jika Anda ingin menampilkan notifikasi
-  // saat aplikasi di background dan pesan FCM hanya berisi 'data' payload.
   static void showNotificationOnBackground(RemoteMessage message) {
-     const AndroidNotificationDetails androidPlatformChannelSpecifics =
+      const AndroidNotificationDetails androidPlatformChannelSpecifics =
         AndroidNotificationDetails(
       'presensi_channel_bg', // ID channel unik untuk background
       'Presensi Notifikasi (Background)', // Nama channel
@@ -77,7 +74,7 @@ class LocalNotificationService {
       importance: Importance.max,
       priority: Priority.high,
       showWhen: false,
-      icon: '@mipmap/ic_launcher',
+      icon: '@mipmap/ic_launcher', // <--- UBAH KE @mipmap/ic_launcher
     );
 
     const NotificationDetails platformChannelSpecifics =
