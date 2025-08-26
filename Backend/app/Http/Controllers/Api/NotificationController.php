@@ -407,4 +407,197 @@ class NotificationController extends Controller
             'message' => "{$deleted} notifications deleted successfully"
         ]);
     }
+
+    /**
+     * Add FCM token to Firestore
+     */
+    public function addFcmTokenToFirestore(Request $request): JsonResponse
+    {
+        $validator = Validator::make($request->all(), [
+            'fcm_token' => 'required|string|max:500',
+            'device_id' => 'nullable|string|max:255',
+            'platform' => 'nullable|string|in:android,ios,web,unknown'
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation failed',
+                'errors' => $validator->errors()
+            ], 422);
+        }
+
+        $user = Auth::user();
+        $employee = null;
+
+        if ($user instanceof Employee) {
+            $employee = $user;
+        } else {
+            $employee = Employee::where('user_id', $user->id)->first();
+        }
+
+        if (!$employee) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Employee not found'
+            ], 404);
+        }
+
+        try {
+            $tokenId = $this->notificationService->addFcmTokenToFirestore(
+                $employee->uid,
+                $request->fcm_token,
+                $request->device_id,
+                $request->platform ?? 'unknown'
+            );
+
+            return response()->json([
+                'success' => true,
+                'message' => 'FCM token added to Firestore successfully',
+                'data' => [
+                    'token_id' => $tokenId,
+                    'employee_uid' => $employee->uid
+                ]
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to add FCM token to Firestore: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Remove FCM token from Firestore
+     */
+    public function removeFcmTokenFromFirestore(Request $request): JsonResponse
+    {
+        $validator = Validator::make($request->all(), [
+            'token_id' => 'required|string'
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation failed',
+                'errors' => $validator->errors()
+            ], 422);
+        }
+
+        $user = Auth::user();
+        $employee = null;
+
+        if ($user instanceof Employee) {
+            $employee = $user;
+        } else {
+            $employee = Employee::where('user_id', $user->id)->first();
+        }
+
+        if (!$employee) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Employee not found'
+            ], 404);
+        }
+
+        try {
+            $result = $this->notificationService->removeFcmTokenFromFirestore(
+                $employee->uid,
+                $request->token_id
+            );
+
+            return response()->json([
+                'success' => true,
+                'message' => 'FCM token removed from Firestore successfully'
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to remove FCM token from Firestore: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Get FCM tokens from Firestore for current employee
+     */
+    public function getFcmTokensFromFirestore(): JsonResponse
+    {
+        $user = Auth::user();
+        $employee = null;
+
+        if ($user instanceof Employee) {
+            $employee = $user;
+        } else {
+            $employee = Employee::where('user_id', $user->id)->first();
+        }
+
+        if (!$employee) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Employee not found'
+            ], 404);
+        }
+
+        try {
+            $tokens = $this->notificationService->getEmployeeFcmTokensFromFirestore($employee->uid);
+
+            return response()->json([
+                'success' => true,
+                'data' => $tokens
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to get FCM tokens from Firestore: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Send test notification using Firestore tokens
+     */
+    public function sendTestNotificationWithFirestoreTokens(Request $request): JsonResponse
+    {
+        $validator = Validator::make($request->all(), [
+            'title' => 'required|string|max:255',
+            'body' => 'required|string',
+            'employee_uid' => 'required|string'
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation failed',
+                'errors' => $validator->errors()
+            ], 422);
+        }
+
+        try {
+            $result = $this->notificationService->sendToEmployeeWithFirestoreTokens(
+                $request->employee_uid,
+                $request->title,
+                $request->body,
+                [
+                    'action' => 'test_notification',
+                    'timestamp' => now()->toISOString(),
+                    'source' => 'api_test'
+                ],
+                [
+                    'type' => Notification::TYPE_GENERAL,
+                    'priority' => Notification::PRIORITY_NORMAL
+                ]
+            );
+
+            return response()->json([
+                'success' => $result,
+                'message' => $result ? 'Test notification sent successfully' : 'Failed to send test notification'
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to send test notification: ' . $e->getMessage()
+            ], 500);
+        }
+    }
 }

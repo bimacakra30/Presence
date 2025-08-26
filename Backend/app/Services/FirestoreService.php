@@ -283,7 +283,9 @@ class FirestoreService
                 if (isset($firestoreUser['name'])) $updateData['name'] = $firestoreUser['name'];
                 if (isset($firestoreUser['address'])) $updateData['address'] = $firestoreUser['address'];
                 if (isset($firestoreUser['username'])) $updateData['username'] = $firestoreUser['username'];
+                if (isset($firestoreUser['phone'])) $updateData['phone'] = $firestoreUser['phone'];
                 if (isset($firestoreUser['provider'])) $updateData['provider'] = $firestoreUser['provider'];
+                if (isset($firestoreUser['dateOfBirth'])) $updateData['date_of_birth'] = $firestoreUser['dateOfBirth'];
                 if (isset($firestoreUser['status'])) $updateData['status'] = $firestoreUser['status'];
                 if (isset($firestoreUser['position'])) $updateData['position'] = $firestoreUser['position'];
                 if (isset($firestoreUser['profilePictureUrl'])) $updateData['photo'] = $firestoreUser['profilePictureUrl'];
@@ -483,5 +485,207 @@ class FirestoreService
         }
 
         return $users;
+    }
+
+    /**
+     * Get FCM tokens for specific employee from Firestore
+     */
+    public function getEmployeeFcmTokens($employeeUid)
+    {
+        try {
+            $collection = $this->db->collection('employees');
+            $document = $collection->document($employeeUid);
+            
+            if (!$document->snapshot()->exists()) {
+                return [];
+            }
+
+            // Get fcmTokens subcollection
+            $fcmTokensCollection = $document->collection('fcmTokens');
+            $tokens = $fcmTokensCollection->documents();
+
+            $fcmTokens = [];
+            foreach ($tokens as $token) {
+                if ($token->exists()) {
+                    $tokenData = $token->data();
+                    $fcmTokens[] = [
+                        'id' => $token->id(),
+                        'token' => $tokenData['token'] ?? '',
+                        'device_id' => $tokenData['deviceId'] ?? '',
+                        'platform' => $tokenData['platform'] ?? 'unknown',
+                        'created_at' => $tokenData['createdAt'] ?? null,
+                        'last_used' => $tokenData['lastUsed'] ?? null,
+                    ];
+                }
+            }
+
+            return $fcmTokens;
+        } catch (\Exception $e) {
+            Log::error("Failed to get FCM tokens for employee {$employeeUid}: " . $e->getMessage());
+            return [];
+        }
+    }
+
+    /**
+     * Add FCM token to employee in Firestore
+     */
+    public function addEmployeeFcmToken($employeeUid, $fcmToken, $deviceId = null, $platform = 'unknown')
+    {
+        try {
+            $collection = $this->db->collection('employees');
+            $document = $collection->document($employeeUid);
+            
+            if (!$document->snapshot()->exists()) {
+                throw new \Exception("Employee with UID {$employeeUid} not found in Firestore");
+            }
+
+            // Add to fcmTokens subcollection
+            $fcmTokensCollection = $document->collection('fcmTokens');
+            
+            $tokenData = [
+                'token' => $fcmToken,
+                'deviceId' => $deviceId,
+                'platform' => $platform,
+                'createdAt' => now()->toISOString(),
+                'lastUsed' => now()->toISOString(),
+            ];
+
+            $docRef = $fcmTokensCollection->add($tokenData);
+            
+            Log::info("FCM token added for employee {$employeeUid}: {$docRef->id()}");
+            
+            return $docRef->id();
+        } catch (\Exception $e) {
+            Log::error("Failed to add FCM token for employee {$employeeUid}: " . $e->getMessage());
+            throw $e;
+        }
+    }
+
+    /**
+     * Remove FCM token from employee in Firestore
+     */
+    public function removeEmployeeFcmToken($employeeUid, $tokenId)
+    {
+        try {
+            $collection = $this->db->collection('employees');
+            $document = $collection->document($employeeUid);
+            
+            if (!$document->snapshot()->exists()) {
+                throw new \Exception("Employee with UID {$employeeUid} not found in Firestore");
+            }
+
+            // Remove from fcmTokens subcollection
+            $fcmTokensCollection = $document->collection('fcmTokens');
+            $fcmTokensCollection->document($tokenId)->delete();
+            
+            Log::info("FCM token removed for employee {$employeeUid}: {$tokenId}");
+            
+            return true;
+        } catch (\Exception $e) {
+            Log::error("Failed to remove FCM token for employee {$employeeUid}: " . $e->getMessage());
+            throw $e;
+        }
+    }
+
+    /**
+     * Update FCM token last used timestamp
+     */
+    public function updateFcmTokenLastUsed($employeeUid, $tokenId)
+    {
+        try {
+            $collection = $this->db->collection('employees');
+            $document = $collection->document($employeeUid);
+            
+            if (!$document->snapshot()->exists()) {
+                throw new \Exception("Employee with UID {$employeeUid} not found in Firestore");
+            }
+
+            // Update lastUsed timestamp
+            $fcmTokensCollection = $document->collection('fcmTokens');
+            $fcmTokensCollection->document($tokenId)->update([
+                ['path' => 'lastUsed', 'value' => now()->toISOString()]
+            ]);
+            
+            return true;
+        } catch (\Exception $e) {
+            Log::error("Failed to update FCM token last used for employee {$employeeUid}: " . $e->getMessage());
+            throw $e;
+        }
+    }
+
+    /**
+     * Get all active FCM tokens for all employees
+     */
+    public function getAllActiveFcmTokens()
+    {
+        try {
+            $collection = $this->db->collection('employees');
+            $documents = $collection->documents();
+
+            $allTokens = [];
+            foreach ($documents as $document) {
+                if ($document->exists()) {
+                    $employeeData = $document->data();
+                    $employeeUid = $document->id();
+                    
+                    // Get FCM tokens for this employee
+                    $fcmTokens = $this->getEmployeeFcmTokens($employeeUid);
+                    
+                    foreach ($fcmTokens as $token) {
+                        $allTokens[] = [
+                            'employee_uid' => $employeeUid,
+                            'employee_name' => $employeeData['name'] ?? 'Unknown',
+                            'employee_email' => $employeeData['email'] ?? '',
+                            'token_id' => $token['id'],
+                            'fcm_token' => $token['token'],
+                            'device_id' => $token['device_id'],
+                            'platform' => $token['platform'],
+                            'created_at' => $token['created_at'],
+                            'last_used' => $token['last_used'],
+                        ];
+                    }
+                }
+            }
+
+            return $allTokens;
+        } catch (\Exception $e) {
+            Log::error("Failed to get all active FCM tokens: " . $e->getMessage());
+            return [];
+        }
+    }
+
+    /**
+     * Clean up old/invalid FCM tokens (older than 30 days)
+     */
+    public function cleanupOldFcmTokens($daysOld = 30)
+    {
+        try {
+            $cutoffDate = now()->subDays($daysOld);
+            $collection = $this->db->collection('employees');
+            $documents = $collection->documents();
+
+            $cleanedCount = 0;
+            foreach ($documents as $document) {
+                if ($document->exists()) {
+                    $employeeUid = $document->id();
+                    $fcmTokens = $this->getEmployeeFcmTokens($employeeUid);
+                    
+                    foreach ($fcmTokens as $token) {
+                        $lastUsed = $token['last_used'] ? \Carbon\Carbon::parse($token['last_used']) : null;
+                        
+                        if ($lastUsed && $lastUsed->lt($cutoffDate)) {
+                            $this->removeEmployeeFcmToken($employeeUid, $token['id']);
+                            $cleanedCount++;
+                        }
+                    }
+                }
+            }
+
+            Log::info("Cleaned up {$cleanedCount} old FCM tokens");
+            return $cleanedCount;
+        } catch (\Exception $e) {
+            Log::error("Failed to cleanup old FCM tokens: " . $e->getMessage());
+            return 0;
+        }
     }
 }

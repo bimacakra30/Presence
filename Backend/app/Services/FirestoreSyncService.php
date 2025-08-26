@@ -123,6 +123,7 @@ class FirestoreSyncService
             'email' => $firestoreUser['email'] ?? '',
             'phone' => $firestoreUser['phone'] ?? null,
             'address' => $firestoreUser['address'] ?? null,
+            'date_of_birth' => $firestoreUser['dateOfBirth'] ?? null,
             'position' => $firestoreUser['position'] ?? '',
             'status' => $firestoreUser['status'] ?? 'aktif',
             'provider' => $firestoreUser['provider'] ?? 'google',
