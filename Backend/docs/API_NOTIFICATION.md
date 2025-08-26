@@ -1,6 +1,6 @@
-# API Notifikasi Mobile
+# API Dokumentasi Notifikasi FCM
 
-Dokumentasi ini menjelaskan cara menggunakan API notifikasi untuk aplikasi mobile.
+Dokumentasi ini menjelaskan cara menggunakan API notifikasi untuk mobile app developer.
 
 ## Base URL
 ```
@@ -8,23 +8,55 @@ https://your-domain.com/api
 ```
 
 ## Authentication
-Semua endpoint memerlukan authentication menggunakan Laravel Sanctum. Include token di header:
+Semua endpoint memerlukan authentication menggunakan Bearer Token:
 ```
-Authorization: Bearer {your_token}
+Authorization: Bearer {your_auth_token}
 ```
 
 ## Endpoints
 
-### 1. Get Notifications
+### 1. Update FCM Token
+
+**POST** `/notifications/fcm-token`
+
+Update FCM token untuk user yang sedang login.
+
+**Request Body:**
+```json
+{
+    "fcm_token": "fMEP0vJqS6:APA91bHqX..."
+}
+```
+
+**Response:**
+```json
+{
+    "success": true,
+    "message": "FCM token updated successfully"
+}
+```
+
+**Contoh cURL:**
+```bash
+curl -X POST https://your-domain.com/api/notifications/fcm-token \
+  -H "Authorization: Bearer your_auth_token" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "fcm_token": "fMEP0vJqS6:APA91bHqX..."
+  }'
+```
+
+### 2. Get Notifications
+
 **GET** `/notifications`
 
 Mendapatkan daftar notifikasi untuk user yang sedang login.
 
 **Query Parameters:**
-- `status` (optional): Filter berdasarkan status (`pending`, `sent`, `failed`, `scheduled`)
-- `type` (optional): Filter berdasarkan tipe (`general`, `presence`, `permit`, `salary`, `announcement`, `system`)
-- `read` (optional): Filter berdasarkan status baca (`true` untuk sudah dibaca, `false` untuk belum dibaca)
-- `per_page` (optional): Jumlah item per halaman (default: 20)
+- `status` (optional): Filter by status (`pending`, `sent`, `failed`, `scheduled`)
+- `type` (optional): Filter by type (`general`, `presence`, `permit`, `salary`, `announcement`, `system`)
+- `read` (optional): Filter by read status (`true`, `false`)
+- `per_page` (optional): Number of items per page (default: 20)
 
 **Response:**
 ```json
@@ -36,30 +68,29 @@ Mendapatkan daftar notifikasi untuk user yang sedang login.
             {
                 "id": 1,
                 "title": "Check-in Berhasil",
-                "body": "Anda telah berhasil check-in pada 08:00",
+                "body": "Anda telah berhasil check-in pada 08:30",
                 "type": "presence",
-                "priority": "normal",
-                "status": "sent",
                 "data": {
-                    "presence_id": 123,
                     "action": "view_presence",
-                    "date": "2024-01-15"
+                    "presence_id": 123,
+                    "date": "2025-08-26"
                 },
-                "image_url": null,
-                "action_url": null,
-                "sent_at": "2024-01-15T08:00:00.000000Z",
+                "status": "sent",
+                "priority": "normal",
                 "read_at": null,
-                "created_at": "2024-01-15T08:00:00.000000Z"
+                "sent_at": "2025-08-26T08:30:00.000000Z",
+                "created_at": "2025-08-26T08:30:00.000000Z"
             }
         ],
-        "total": 50,
+        "total": 1,
         "per_page": 20
     },
     "unread_count": 5
 }
 ```
 
-### 2. Get Single Notification
+### 3. Get Single Notification
+
 **GET** `/notifications/{id}`
 
 Mendapatkan detail notifikasi berdasarkan ID.
@@ -71,25 +102,24 @@ Mendapatkan detail notifikasi berdasarkan ID.
     "data": {
         "id": 1,
         "title": "Check-in Berhasil",
-        "body": "Anda telah berhasil check-in pada 08:00",
+        "body": "Anda telah berhasil check-in pada 08:30",
         "type": "presence",
-        "priority": "normal",
-        "status": "sent",
         "data": {
-            "presence_id": 123,
             "action": "view_presence",
-            "date": "2024-01-15"
+            "presence_id": 123,
+            "date": "2025-08-26"
         },
-        "image_url": null,
-        "action_url": null,
-        "sent_at": "2024-01-15T08:00:00.000000Z",
+        "status": "sent",
+        "priority": "normal",
         "read_at": null,
-        "created_at": "2024-01-15T08:00:00.000000Z"
+        "sent_at": "2025-08-26T08:30:00.000000Z",
+        "created_at": "2025-08-26T08:30:00.000000Z"
     }
 }
 ```
 
-### 3. Mark Notification as Read
+### 4. Mark Notification as Read
+
 **PATCH** `/notifications/{id}/read`
 
 Menandai notifikasi sebagai sudah dibaca.
@@ -102,10 +132,11 @@ Menandai notifikasi sebagai sudah dibaca.
 }
 ```
 
-### 4. Mark Multiple Notifications as Read
+### 5. Mark Multiple Notifications as Read
+
 **PATCH** `/notifications/mark-read`
 
-Menandai beberapa notifikasi sebagai sudah dibaca.
+Menandai multiple notifikasi sebagai sudah dibaca.
 
 **Request Body:**
 ```json
@@ -122,7 +153,8 @@ Menandai beberapa notifikasi sebagai sudah dibaca.
 }
 ```
 
-### 5. Mark All Notifications as Read
+### 6. Mark All Notifications as Read
+
 **PATCH** `/notifications/mark-all-read`
 
 Menandai semua notifikasi sebagai sudah dibaca.
@@ -135,53 +167,35 @@ Menandai semua notifikasi sebagai sudah dibaca.
 }
 ```
 
-### 6. Update FCM Token
-**POST** `/notifications/fcm-token`
-
-Memperbarui FCM token untuk push notification.
-
-**Request Body:**
-```json
-{
-    "fcm_token": "your_fcm_token_here"
-}
-```
-
-**Response:**
-```json
-{
-    "success": true,
-    "message": "FCM token updated successfully"
-}
-```
-
 ### 7. Get Notification Statistics
+
 **GET** `/notifications/statistics`
 
-Mendapatkan statistik notifikasi.
+Mendapatkan statistik notifikasi untuk user yang sedang login.
 
 **Response:**
 ```json
 {
     "success": true,
     "data": {
-        "total": 50,
+        "total": 25,
         "unread": 5,
-        "read": 45,
+        "read": 20,
         "by_type": {
-            "presence": 20,
-            "permit": 15,
-            "general": 10,
-            "announcement": 5
+            "presence": 10,
+            "permit": 5,
+            "announcement": 8,
+            "general": 2
         }
     }
 }
 ```
 
 ### 8. Delete Notification
+
 **DELETE** `/notifications/{id}`
 
-Menghapus notifikasi.
+Menghapus notifikasi berdasarkan ID.
 
 **Response:**
 ```json
@@ -192,9 +206,10 @@ Menghapus notifikasi.
 ```
 
 ### 9. Delete Multiple Notifications
+
 **DELETE** `/notifications`
 
-Menghapus beberapa notifikasi.
+Menghapus multiple notifikasi.
 
 **Request Body:**
 ```json
@@ -213,15 +228,7 @@ Menghapus beberapa notifikasi.
 
 ## Error Responses
 
-### 404 Not Found
-```json
-{
-    "success": false,
-    "message": "Notification not found"
-}
-```
-
-### 422 Validation Error
+### 400 Bad Request
 ```json
 {
     "success": false,
@@ -235,15 +242,35 @@ Menghapus beberapa notifikasi.
 ### 401 Unauthorized
 ```json
 {
-    "message": "Unauthenticated."
+    "success": false,
+    "message": "Unauthenticated"
+}
+```
+
+### 404 Not Found
+```json
+{
+    "success": false,
+    "message": "Notification not found"
+}
+```
+
+### 422 Unprocessable Entity
+```json
+{
+    "success": false,
+    "message": "Validation failed",
+    "errors": {
+        "notification_ids": ["The notification ids field is required."]
+    }
 }
 ```
 
 ## Notification Types
 
 - `general`: Notifikasi umum
-- `presence`: Notifikasi terkait kehadiran (check-in, check-out, keterlambatan)
-- `permit`: Notifikasi terkait pengajuan izin
+- `presence`: Notifikasi terkait kehadiran (check-in/check-out)
+- `permit`: Notifikasi terkait izin
 - `salary`: Notifikasi terkait gaji
 - `announcement`: Notifikasi pengumuman
 - `system`: Notifikasi sistem
@@ -255,132 +282,163 @@ Menghapus beberapa notifikasi.
 - `high`: Prioritas tinggi
 - `urgent`: Prioritas sangat tinggi
 
-## Notification Status
+## Notification Data Structure
 
-- `pending`: Menunggu pengiriman
-- `sent`: Berhasil dikirim
-- `failed`: Gagal dikirim
-- `scheduled`: Terjadwal untuk dikirim
+Setiap notifikasi memiliki field `data` yang berisi informasi tambahan:
 
-## Data Structure
-
-Field `data` berisi informasi tambahan yang dapat digunakan oleh aplikasi mobile:
-
-### Presence Notification
 ```json
 {
-    "presence_id": 123,
-    "action": "view_presence",
-    "date": "2024-01-15",
-    "late_duration": 15
+    "action": "view_presence",        // Action yang akan dilakukan saat notifikasi di-tap
+    "presence_id": 123,              // ID data terkait
+    "date": "2025-08-26",            // Tanggal terkait
+    "timestamp": "2025-08-26T08:30:00.000000Z"  // Timestamp
 }
 ```
 
-### Permit Notification
-```json
-{
-    "permit_id": 456,
-    "action": "view_permit",
-    "start_date": "2024-01-20",
-    "end_date": "2024-01-22",
-    "type": "sick",
-    "status": "approved"
+## Implementation Guide
+
+### 1. Update FCM Token saat Login
+
+```javascript
+// Setelah user login berhasil
+const fcmToken = await messaging().getToken();
+await updateFcmToken(fcmToken);
+
+async function updateFcmToken(token) {
+    const response = await fetch('/api/notifications/fcm-token', {
+        method: 'POST',
+        headers: {
+            'Authorization': `Bearer ${authToken}`,
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ fcm_token: token }),
+    });
+    
+    const result = await response.json();
+    if (!result.success) {
+        console.error('Failed to update FCM token:', result.message);
+    }
 }
 ```
 
-## Implementation Example (Flutter)
+### 2. Handle FCM Token Refresh
 
-```dart
-class NotificationService {
-  final String baseUrl = 'https://your-domain.com/api';
-  final String token = 'your_auth_token';
+```javascript
+// Listen for token refresh
+messaging().onTokenRefresh(() => {
+    messaging().getToken().then((refreshedToken) => {
+        updateFcmToken(refreshedToken);
+    });
+});
+```
 
-  Future<List<Notification>> getNotifications({
-    String? status,
-    String? type,
-    bool? read,
-    int perPage = 20,
-  }) async {
-    final queryParams = <String, String>{};
-    if (status != null) queryParams['status'] = status;
-    if (type != null) queryParams['type'] = type;
-    if (read != null) queryParams['read'] = read.toString();
-    queryParams['per_page'] = perPage.toString();
+### 3. Get Notifications
 
-    final response = await http.get(
-      Uri.parse('$baseUrl/notifications').replace(queryParameters: queryParams),
-      headers: {
-        'Authorization': 'Bearer $token',
-        'Content-Type': 'application/json',
-      },
-    );
-
-    if (response.statusCode == 200) {
-      final data = json.decode(response.body);
-      return (data['data']['data'] as List)
-          .map((json) => Notification.fromJson(json))
-          .toList();
-    } else {
-      throw Exception('Failed to load notifications');
+```javascript
+async function getNotifications(page = 1) {
+    const response = await fetch(`/api/notifications?page=${page}`, {
+        headers: {
+            'Authorization': `Bearer ${authToken}`,
+        },
+    });
+    
+    const result = await response.json();
+    if (result.success) {
+        return result.data;
     }
-  }
-
-  Future<void> markAsRead(int notificationId) async {
-    final response = await http.patch(
-      Uri.parse('$baseUrl/notifications/$notificationId/read'),
-      headers: {
-        'Authorization': 'Bearer $token',
-        'Content-Type': 'application/json',
-      },
-    );
-
-    if (response.statusCode != 200) {
-      throw Exception('Failed to mark notification as read');
-    }
-  }
-
-  Future<void> updateFcmToken(String fcmToken) async {
-    final response = await http.post(
-      Uri.parse('$baseUrl/notifications/fcm-token'),
-      headers: {
-        'Authorization': 'Bearer $token',
-        'Content-Type': 'application/json',
-      },
-      body: json.encode({
-        'fcm_token': fcmToken,
-      }),
-    );
-
-    if (response.statusCode != 200) {
-      throw Exception('Failed to update FCM token');
-    }
-  }
+    
+    throw new Error(result.message);
 }
 ```
 
-## Setup FCM di Mobile App
+### 4. Mark Notification as Read
 
-1. **Android**: Tambahkan `google-services.json` ke project
-2. **iOS**: Tambahkan `GoogleService-Info.plist` ke project
-3. **Flutter**: Install package `firebase_messaging`
-4. **Update FCM Token**: Panggil endpoint `/notifications/fcm-token` setiap kali token berubah
+```javascript
+async function markAsRead(notificationId) {
+    const response = await fetch(`/api/notifications/${notificationId}/read`, {
+        method: 'PATCH',
+        headers: {
+            'Authorization': `Bearer ${authToken}`,
+        },
+    });
+    
+    const result = await response.json();
+    return result.success;
+}
+```
+
+### 5. Handle Notification Tap
+
+```javascript
+// Handle notification tap when app is in background
+messaging().onNotificationOpenedApp((remoteMessage) => {
+    const data = remoteMessage.data;
+    
+    switch (data.action) {
+        case 'view_presence':
+            navigateToPresenceDetail(data.presence_id);
+            break;
+        case 'view_permit':
+            navigateToPermitDetail(data.permit_id);
+            break;
+        case 'view_announcement':
+            navigateToAnnouncement(data.announcement_id);
+            break;
+        default:
+            navigateToNotifications();
+    }
+});
+```
 
 ## Testing
 
-Untuk testing, Anda dapat menggunakan Postman atau curl:
+### Test dengan Postman
+
+1. **Update FCM Token:**
+   ```
+   POST /api/notifications/fcm-token
+   Authorization: Bearer your_token
+   Content-Type: application/json
+   
+   {
+       "fcm_token": "test_fcm_token_123"
+   }
+   ```
+
+2. **Get Notifications:**
+   ```
+   GET /api/notifications
+   Authorization: Bearer your_token
+   ```
+
+3. **Mark as Read:**
+   ```
+   PATCH /api/notifications/1/read
+   Authorization: Bearer your_token
+   ```
+
+### Test dengan cURL
 
 ```bash
+# Update FCM token
+curl -X POST https://your-domain.com/api/notifications/fcm-token \
+  -H "Authorization: Bearer your_token" \
+  -H "Content-Type: application/json" \
+  -d '{"fcm_token": "test_token_123"}'
+
 # Get notifications
-curl -X GET "https://your-domain.com/api/notifications" \
+curl -X GET https://your-domain.com/api/notifications \
   -H "Authorization: Bearer your_token"
 
 # Mark as read
-curl -X PATCH "https://your-domain.com/api/notifications/1/read" \
+curl -X PATCH https://your-domain.com/api/notifications/1/read \
   -H "Authorization: Bearer your_token"
-
-# Update FCM token
-curl -X POST "https://your-domain.com/api/notifications/fcm-token" \
-  -H "Authorization: Bearer your_token" \
-  -H "Content-Type: application/json" \
-  -d '{"fcm_token": "test_token"}'
 ```
+
+## Notes
+
+1. **FCM Token**: Harus diupdate setiap kali user login atau token refresh
+2. **Authentication**: Semua endpoint memerlukan valid authentication
+3. **Rate Limiting**: API memiliki rate limiting untuk mencegah abuse
+4. **Error Handling**: Selalu handle error responses dengan baik
+5. **Offline Support**: Simpan notifikasi lokal untuk offline access
