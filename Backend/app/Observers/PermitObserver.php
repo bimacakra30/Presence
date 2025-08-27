@@ -5,6 +5,8 @@ namespace App\Observers;
 use App\Models\Permit;
 use App\Services\NotificationService;
 use App\Models\Notification;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Log;
 
 class PermitObserver
 {
@@ -20,23 +22,31 @@ class PermitObserver
      */
     public function created(Permit $permit): void
     {
-        $employee = $permit->employee;
+        // Get employee by UID
+        $employee = null;
+        if ($permit->uid) {
+            $employee = \App\Models\Employee::where('uid', $permit->uid)->first();
+        }
         
         if (!$employee) {
             return;
         }
 
+        // Convert string dates to Carbon objects
+        $tanggalMulai = \Carbon\Carbon::parse($permit->tanggal_mulai);
+        $tanggalSelesai = \Carbon\Carbon::parse($permit->tanggal_selesai);
+
         // Notifikasi pengajuan izin
-        $this->notificationService->sendToRecipient(
-            $employee,
+        $this->notificationService->sendToEmployeeWithFirestoreTokens(
+            $employee->uid,
             'Pengajuan Izin Berhasil',
-            "Pengajuan izin Anda untuk tanggal " . $permit->start_date->format('d/m/Y') . " telah berhasil diajukan",
+            "Pengajuan izin {$permit->jenis_perizinan} Anda untuk tanggal " . $tanggalMulai->format('d/m/Y') . " telah berhasil diajukan",
             [
                 'permit_id' => $permit->id,
                 'action' => 'view_permit',
-                'start_date' => $permit->start_date,
-                'end_date' => $permit->end_date,
-                'type' => $permit->type,
+                'tanggal_mulai' => $permit->tanggal_mulai,
+                'tanggal_selesai' => $permit->tanggal_selesai,
+                'jenis_perizinan' => $permit->jenis_perizinan,
             ],
             [
                 'type' => Notification::TYPE_PERMIT,
@@ -53,14 +63,33 @@ class PermitObserver
      */
     public function updated(Permit $permit): void
     {
-        $employee = $permit->employee;
+        // Get employee by UID
+        $employee = null;
+        if ($permit->uid) {
+            $employee = \App\Models\Employee::where('uid', $permit->uid)->first();
+        }
         
         if (!$employee) {
             return;
         }
 
+        // Convert string dates to Carbon objects
+        $tanggalMulai = \Carbon\Carbon::parse($permit->tanggal_mulai);
+        $tanggalSelesai = \Carbon\Carbon::parse($permit->tanggal_selesai);
+
         // Jika status berubah
         if ($permit->wasChanged('status')) {
+            Log::info("PermitObserver: Status changed for permit {$permit->id} from '{$permit->getOriginal('status')}' to '{$permit->status}'");
+            
+            // Add debouncing for status change notifications
+            $cacheKey = "permit_status_change:{$permit->id}:{$permit->status}";
+            if (Cache::has($cacheKey)) {
+                Log::info("Skipping duplicate status change notification for permit {$permit->id} with status {$permit->status} (cache hit)");
+                return;
+            }
+            
+            Log::info("PermitObserver: Proceeding with status change notification for permit {$permit->id} with status {$permit->status}");
+            
             $statusMessages = [
                 'approved' => 'Pengajuan izin Anda telah disetujui',
                 'rejected' => 'Pengajuan izin Anda ditolak',
@@ -68,16 +97,16 @@ class PermitObserver
             ];
 
             if (isset($statusMessages[$permit->status])) {
-                $this->notificationService->sendToRecipient(
-                    $employee,
+                $this->notificationService->sendToEmployeeWithFirestoreTokens(
+                    $employee->uid,
                     'Status Pengajuan Izin Diperbarui',
                     $statusMessages[$permit->status],
                     [
                         'permit_id' => $permit->id,
                         'action' => 'view_permit',
-                        'start_date' => $permit->start_date,
-                        'end_date' => $permit->end_date,
-                        'type' => $permit->type,
+                        'tanggal_mulai' => $permit->tanggal_mulai,
+                        'tanggal_selesai' => $permit->tanggal_selesai,
+                        'jenis_perizinan' => $permit->jenis_perizinan,
                         'status' => $permit->status,
                     ],
                     [
@@ -85,21 +114,24 @@ class PermitObserver
                         'priority' => $permit->status === 'rejected' ? Notification::PRIORITY_HIGH : Notification::PRIORITY_NORMAL,
                     ]
                 );
+                
+                // Set cache to prevent duplicate status change notifications (5 minutes)
+                Cache::put($cacheKey, true, now()->addMinutes(5));
             }
         }
 
         // Jika ada perubahan tanggal
-        if ($permit->wasChanged('start_date') || $permit->wasChanged('end_date')) {
-            $this->notificationService->sendToRecipient(
-                $employee,
+        if ($permit->wasChanged('tanggal_mulai') || $permit->wasChanged('tanggal_selesai')) {
+            $this->notificationService->sendToEmployeeWithFirestoreTokens(
+                $employee->uid,
                 'Tanggal Izin Diperbarui',
-                "Tanggal izin Anda telah diperbarui menjadi " . $permit->start_date->format('d/m/Y') . " - " . $permit->end_date->format('d/m/Y'),
+                "Tanggal izin Anda telah diperbarui menjadi " . $tanggalMulai->format('d/m/Y') . " - " . $tanggalSelesai->format('d/m/Y'),
                 [
                     'permit_id' => $permit->id,
                     'action' => 'view_permit',
-                    'start_date' => $permit->start_date,
-                    'end_date' => $permit->end_date,
-                    'type' => $permit->type,
+                    'tanggal_mulai' => $permit->tanggal_mulai,
+                    'tanggal_selesai' => $permit->tanggal_selesai,
+                    'jenis_perizinan' => $permit->jenis_perizinan,
                 ],
                 [
                     'type' => Notification::TYPE_PERMIT,
@@ -114,20 +146,27 @@ class PermitObserver
      */
     public function deleted(Permit $permit): void
     {
-        $employee = $permit->employee;
+        // Get employee by UID
+        $employee = null;
+        if ($permit->uid) {
+            $employee = \App\Models\Employee::where('uid', $permit->uid)->first();
+        }
         
         if (!$employee) {
             return;
         }
 
-        $this->notificationService->sendToRecipient(
-            $employee,
+        // Convert string dates to Carbon objects
+        $tanggalMulai = \Carbon\Carbon::parse($permit->tanggal_mulai);
+
+        $this->notificationService->sendToEmployeeWithFirestoreTokens(
+            $employee->uid,
             'Pengajuan Izin Dihapus',
-            "Pengajuan izin Anda untuk tanggal " . $permit->start_date->format('d/m/Y') . " telah dihapus",
+            "Pengajuan izin {$permit->jenis_perizinan} Anda untuk tanggal " . $tanggalMulai->format('d/m/Y') . " telah dihapus",
             [
-                'start_date' => $permit->start_date,
-                'end_date' => $permit->end_date,
-                'type' => $permit->type,
+                'tanggal_mulai' => $permit->tanggal_mulai,
+                'tanggal_selesai' => $permit->tanggal_selesai,
+                'jenis_perizinan' => $permit->jenis_perizinan,
                 'action' => 'view_permit_history',
             ],
             [
@@ -142,22 +181,29 @@ class PermitObserver
      */
     public function restored(Permit $permit): void
     {
-        $employee = $permit->employee;
+        // Get employee by UID
+        $employee = null;
+        if ($permit->uid) {
+            $employee = \App\Models\Employee::where('uid', $permit->uid)->first();
+        }
         
         if (!$employee) {
             return;
         }
 
-        $this->notificationService->sendToRecipient(
-            $employee,
+        // Convert string dates to Carbon objects
+        $tanggalMulai = \Carbon\Carbon::parse($permit->tanggal_mulai);
+
+        $this->notificationService->sendToEmployeeWithFirestoreTokens(
+            $employee->uid,
             'Pengajuan Izin Dipulihkan',
-            "Pengajuan izin Anda untuk tanggal " . $permit->start_date->format('d/m/Y') . " telah dipulihkan",
+            "Pengajuan izin {$permit->jenis_perizinan} Anda untuk tanggal " . $tanggalMulai->format('d/m/Y') . " telah dipulihkan",
             [
                 'permit_id' => $permit->id,
                 'action' => 'view_permit',
-                'start_date' => $permit->start_date,
-                'end_date' => $permit->end_date,
-                'type' => $permit->type,
+                'tanggal_mulai' => $permit->tanggal_mulai,
+                'tanggal_selesai' => $permit->tanggal_selesai,
+                'jenis_perizinan' => $permit->jenis_perizinan,
             ],
             [
                 'type' => Notification::TYPE_PERMIT,
@@ -171,20 +217,27 @@ class PermitObserver
      */
     public function forceDeleted(Permit $permit): void
     {
-        $employee = $permit->employee;
+        // Get employee by UID
+        $employee = null;
+        if ($permit->uid) {
+            $employee = \App\Models\Employee::where('uid', $permit->uid)->first();
+        }
         
         if (!$employee) {
             return;
         }
 
-        $this->notificationService->sendToRecipient(
-            $employee,
+        // Convert string dates to Carbon objects
+        $tanggalMulai = \Carbon\Carbon::parse($permit->tanggal_mulai);
+
+        $this->notificationService->sendToEmployeeWithFirestoreTokens(
+            $employee->uid,
             'Pengajuan Izin Dihapus Permanen',
-            "Pengajuan izin Anda untuk tanggal " . $permit->start_date->format('d/m/Y') . " telah dihapus secara permanen",
+            "Pengajuan izin {$permit->jenis_perizinan} Anda untuk tanggal " . $tanggalMulai->format('d/m/Y') . " telah dihapus secara permanen",
             [
-                'start_date' => $permit->start_date,
-                'end_date' => $permit->end_date,
-                'type' => $permit->type,
+                'tanggal_mulai' => $permit->tanggal_mulai,
+                'tanggal_selesai' => $permit->tanggal_selesai,
+                'jenis_perizinan' => $permit->jenis_perizinan,
                 'action' => 'view_permit_history',
             ],
             [
@@ -199,6 +252,19 @@ class PermitObserver
      */
     protected function notifySupervisors(Permit $permit): void
     {
+        // Get employee by UID
+        $employee = null;
+        if ($permit->uid) {
+            $employee = \App\Models\Employee::where('uid', $permit->uid)->first();
+        }
+        
+        if (!$employee) {
+            return;
+        }
+
+        // Convert string dates to Carbon objects
+        $tanggalMulai = \Carbon\Carbon::parse($permit->tanggal_mulai);
+
         // Get supervisors/admins (you can customize this based on your role system)
         $supervisors = \App\Models\Employee::where('position', 'like', '%supervisor%')
             ->orWhere('position', 'like', '%manager%')
@@ -206,17 +272,17 @@ class PermitObserver
             ->get();
 
         foreach ($supervisors as $supervisor) {
-            $this->notificationService->sendToRecipient(
-                $supervisor,
+            $this->notificationService->sendToEmployeeWithFirestoreTokens(
+                $supervisor->uid,
                 'Pengajuan Izin Baru',
-                "Karyawan {$permit->employee->name} mengajukan izin untuk tanggal " . $permit->start_date->format('d/m/Y'),
+                "Karyawan {$employee->name} mengajukan izin {$permit->jenis_perizinan} untuk tanggal " . $tanggalMulai->format('d/m/Y'),
                 [
                     'permit_id' => $permit->id,
                     'action' => 'review_permit',
-                    'employee_name' => $permit->employee->name,
-                    'start_date' => $permit->start_date,
-                    'end_date' => $permit->end_date,
-                    'type' => $permit->type,
+                    'employee_name' => $employee->name,
+                    'tanggal_mulai' => $permit->tanggal_mulai,
+                    'tanggal_selesai' => $permit->tanggal_selesai,
+                    'jenis_perizinan' => $permit->jenis_perizinan,
                 ],
                 [
                     'type' => Notification::TYPE_PERMIT,

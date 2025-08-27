@@ -556,12 +556,10 @@ class EmployeeResource extends Resource
     public static function getNavigationBadge(): ?string
     {
         try {
-            // Get count from Firestore
-            $firestoreService = new FirestoreService();
-            return (string) $firestoreService->getUsersCount();
-        } catch (\Exception $e) {
-            // Fallback to local count if Firestore fails
+            // Use local count to reduce Firestore requests
             return (string) Employee::count();
+        } catch (\Exception $e) {
+            return '0';
         }
     }
 

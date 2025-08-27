@@ -1,4 +1,4 @@
-<div wire:poll.{{ isset($pollInterval) ? $pollInterval : 10000 }}ms="loadEmployees">
+<div @if($pollInterval) wire:poll.{{ $pollInterval }}ms="loadEmployees" @endif>
     <table class="min-w-full divide-y divide-gray-200">
         <thead class="bg-gray-50">
             <tr>
@@ -29,4 +29,12 @@
             @endif
         </tbody>
     </table>
+    
+    @if(!$pollInterval)
+        <div class="mt-4 text-center">
+            <button wire:click="loadEmployees" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
+                Refresh Data
+            </button>
+        </div>
+    @endif
 </div>

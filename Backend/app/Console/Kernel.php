@@ -15,36 +15,8 @@ class Kernel extends ConsoleKernel
         // Process scheduled notifications every minute
         $schedule->command('notifications:process-scheduled')->everyMinute();
         
-        // Automated presence notifications
-        // Check-in reminder (07:30 - 30 minutes before check-in)
-        $schedule->command('notifications:automated-presence --type=reminder')
-            ->dailyAt('07:30')
-            ->withoutOverlapping()
-            ->runInBackground();
-        
-        // Check-in notification (08:00)
-        $schedule->command('notifications:automated-presence --type=check-in')
-            ->dailyAt('08:00')
-            ->withoutOverlapping()
-            ->runInBackground();
-        
-        // Late notification (08:15 - 15 minutes after check-in)
-        $schedule->command('notifications:automated-presence --type=late')
-            ->dailyAt('08:15')
-            ->withoutOverlapping()
-            ->runInBackground();
-        
-        // Check-out reminder (16:30 - 30 minutes before check-out)
-        $schedule->command('notifications:automated-presence --type=reminder')
-            ->dailyAt('16:30')
-            ->withoutOverlapping()
-            ->runInBackground();
-        
-        // Check-out notification (17:00)
-        $schedule->command('notifications:automated-presence --type=check-out')
-            ->dailyAt('17:00')
-            ->withoutOverlapping()
-            ->runInBackground();
+        // Automated presence notifications - REMOVED (handled locally)
+        // All presence reminders and notifications are now handled in local app
         
         // Cleanup old FCM tokens weekly
         $schedule->command('fcm:cleanup-tokens')

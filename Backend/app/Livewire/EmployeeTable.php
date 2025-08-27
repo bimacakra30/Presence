@@ -13,10 +13,14 @@ class EmployeeTable extends Component
 
     public $employees = [];
     public $perPage = 10;
-    public $pollInterval = 10000; // Polling setiap 10 detik (dalam milidetik)
+    public $pollInterval; // Polling interval dari environment variable
 
     public function mount(FirestoreService $firestoreService)
     {
+        // Set polling interval berdasarkan konfigurasi realtime
+        $realtimeEnabled = env('FIRESTORE_REALTIME_ENABLED', false);
+        $this->pollInterval = $realtimeEnabled ? env('LIVEWIRE_POLL_INTERVAL', 10000) : null;
+        
         $this->loadEmployees($firestoreService);
     }
 

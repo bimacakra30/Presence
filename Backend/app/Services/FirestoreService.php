@@ -9,7 +9,7 @@ use Illuminate\Support\Facades\Log;
 class FirestoreService
 {
     protected $db;
-    protected $cacheTimeout = 30; // Cache selama 30 detik untuk realtime experience
+    protected $cacheTimeout; // Cache timeout dari environment variable
 
     public function __construct()
     {
@@ -17,6 +17,9 @@ class FirestoreService
             'keyFilePath' => base_path('storage/app/firebase/firebase_credentials.json'),
             'transport' => 'rest',
         ]);
+        
+        // Set cache timeout dari environment variable
+        $this->cacheTimeout = (int) env('FIRESTORE_CACHE_TIMEOUT', 300); // Default 5 menit
     }
 
     public function getCollection()
@@ -85,6 +88,12 @@ class FirestoreService
     {
         $cacheKey = 'firestore_employees_list';
         
+        // Jika realtime dinonaktifkan, selalu gunakan cache jika tersedia
+        $realtimeEnabled = env('FIRESTORE_REALTIME_ENABLED', false);
+        if (!$realtimeEnabled && Cache::has($cacheKey)) {
+            return Cache::get($cacheKey);
+        }
+        
         if ($useCache && Cache::has($cacheKey)) {
             return Cache::get($cacheKey);
         }
@@ -126,18 +135,24 @@ class FirestoreService
         }
 
         $collection = $this->db->collection('employees');
-        $document = $collection->document((string)$id)->snapshot();
+        $document = $collection->document((string)$id);
 
-        if ($document->exists()) {
-            $data = $document->data();
-            $data['id'] = $document->id();
-            $data = $this->normalizeUserData($data);
+        try {
+            $snapshot = $document->snapshot();
             
-            // Cache individual user and track the key
-            Cache::put($cacheKey, $data, now()->addSeconds($this->cacheTimeout));
-            $this->addToTrackedKeys($cacheKey);
-            
-            return $data;
+            if ($snapshot->exists()) {
+                $data = $snapshot->data();
+                $data['id'] = $snapshot->id();
+                $data = $this->normalizeUserData($data);
+                
+                // Cache individual user and track the key
+                Cache::put($cacheKey, $data, now()->addSeconds($this->cacheTimeout));
+                $this->addToTrackedKeys($cacheKey);
+                
+                return $data;
+            }
+        } catch (\Exception $e) {
+            Log::warning("Failed to get user {$id} from Firestore: " . $e->getMessage());
         }
 
         return null;
@@ -222,6 +237,17 @@ class FirestoreService
         }
 
         try {
+            // Check if we're hitting rate limits
+            $lastRequestTime = Cache::get('firestore_last_request_time');
+            $currentTime = time();
+            
+            if ($lastRequestTime && ($currentTime - $lastRequestTime) < 1) {
+                // Rate limiting: wait at least 1 second between requests
+                return Cache::get($cacheKey, 0);
+            }
+            
+            Cache::put('firestore_last_request_time', $currentTime, 60);
+            
             $collection = $this->db->collection('employees');
             $documents = $collection->documents();
             
@@ -237,6 +263,13 @@ class FirestoreService
             
         } catch (\Exception $e) {
             Log::error('Failed to get users count from Firestore: ' . $e->getMessage());
+            
+            // If quota exceeded, use longer cache
+            if (strpos($e->getMessage(), 'Quota exceeded') !== false || 
+                strpos($e->getMessage(), 'RESOURCE_EXHAUSTED') !== false) {
+                Cache::put($cacheKey, 0, now()->addMinutes(30)); // Cache for 30 minutes on quota error
+            }
+            
             return 0;
         }
     }
@@ -493,32 +526,80 @@ class FirestoreService
     public function getEmployeeFcmTokens($employeeUid)
     {
         try {
-            $collection = $this->db->collection('employees');
-            $document = $collection->document($employeeUid);
-            
-            if (!$document->snapshot()->exists()) {
-                return [];
-            }
-
-            // Get fcmTokens subcollection
-            $fcmTokensCollection = $document->collection('fcmTokens');
-            $tokens = $fcmTokensCollection->documents();
+            // Try collection 'fcmTokens' first (as separate collection)
+            $fcmTokensCollection = $this->db->collection('fcmTokens');
+            $tokens = $fcmTokensCollection->where('employeeUid', '=', $employeeUid)->documents();
 
             $fcmTokens = [];
+            $deviceTokens = []; // Track tokens by device to prevent duplicates
+            
             foreach ($tokens as $token) {
                 if ($token->exists()) {
                     $tokenData = $token->data();
-                    $fcmTokens[] = [
-                        'id' => $token->id(),
-                        'token' => $tokenData['token'] ?? '',
-                        'device_id' => $tokenData['deviceId'] ?? '',
-                        'platform' => $tokenData['platform'] ?? 'unknown',
-                        'created_at' => $tokenData['createdAt'] ?? null,
-                        'last_used' => $tokenData['lastUsed'] ?? null,
-                    ];
+                    $deviceId = $tokenData['deviceId'] ?? 'unknown';
+                    
+                    // Only add if we haven't seen this device before, or if it's a newer token
+                    if (!isset($deviceTokens[$deviceId]) || 
+                        ($tokenData['lastUsed'] ?? '') > ($deviceTokens[$deviceId]['lastUsed'] ?? '')) {
+                        
+                        $deviceTokens[$deviceId] = [
+                            'id' => $token->id(),
+                            'token' => $tokenData['token'] ?? '',
+                            'device_id' => $deviceId,
+                            'platform' => $tokenData['platform'] ?? 'unknown',
+                            'created_at' => $tokenData['createdAt'] ?? null,
+                            'last_used' => $tokenData['lastUsed'] ?? null,
+                        ];
+                    }
                 }
             }
 
+            // If no tokens found in separate collection, try subcollection approach
+            if (empty($deviceTokens)) {
+                $collection = $this->db->collection('employees');
+                $document = $collection->document($employeeUid);
+                
+                try {
+                    $snapshot = $document->snapshot();
+                    if (!$snapshot->exists()) {
+                        return [];
+                    }
+                } catch (\Exception $e) {
+                    Log::warning("Failed to check document existence for employee {$employeeUid}: " . $e->getMessage());
+                    return [];
+                }
+
+                // Get fcmTokens subcollection
+                $fcmTokensSubcollection = $document->collection('fcmTokens');
+                $subTokens = $fcmTokensSubcollection->documents();
+
+                foreach ($subTokens as $token) {
+                    if ($token->exists()) {
+                        $tokenData = $token->data();
+                        $deviceId = $tokenData['deviceId'] ?? 'unknown';
+                        
+                        // Only add if we haven't seen this device before, or if it's a newer token
+                        if (!isset($deviceTokens[$deviceId]) || 
+                            ($tokenData['lastUsed'] ?? '') > ($deviceTokens[$deviceId]['lastUsed'] ?? '')) {
+                            
+                            $deviceTokens[$deviceId] = [
+                                'id' => $token->id(),
+                                'token' => $tokenData['token'] ?? '',
+                                'device_id' => $deviceId,
+                                'platform' => $tokenData['platform'] ?? 'unknown',
+                                'created_at' => $tokenData['createdAt'] ?? null,
+                                'last_used' => $tokenData['lastUsed'] ?? null,
+                            ];
+                        }
+                    }
+                }
+            }
+
+            // Convert device tokens back to array
+            $fcmTokens = array_values($deviceTokens);
+            
+            Log::info("Retrieved " . count($fcmTokens) . " unique device tokens for employee {$employeeUid}");
+            
             return $fcmTokens;
         } catch (\Exception $e) {
             Log::error("Failed to get FCM tokens for employee {$employeeUid}: " . $e->getMessage());
@@ -535,7 +616,13 @@ class FirestoreService
             $collection = $this->db->collection('employees');
             $document = $collection->document($employeeUid);
             
-            if (!$document->snapshot()->exists()) {
+            try {
+                $snapshot = $document->snapshot();
+                if (!$snapshot->exists()) {
+                    throw new \Exception("Employee with UID {$employeeUid} not found in Firestore");
+                }
+            } catch (\Exception $e) {
+                Log::warning("Failed to check document existence for employee {$employeeUid}: " . $e->getMessage());
                 throw new \Exception("Employee with UID {$employeeUid} not found in Firestore");
             }
 
@@ -570,7 +657,13 @@ class FirestoreService
             $collection = $this->db->collection('employees');
             $document = $collection->document($employeeUid);
             
-            if (!$document->snapshot()->exists()) {
+            try {
+                $snapshot = $document->snapshot();
+                if (!$snapshot->exists()) {
+                    throw new \Exception("Employee with UID {$employeeUid} not found in Firestore");
+                }
+            } catch (\Exception $e) {
+                Log::warning("Failed to check document existence for employee {$employeeUid}: " . $e->getMessage());
                 throw new \Exception("Employee with UID {$employeeUid} not found in Firestore");
             }
 
@@ -596,7 +689,13 @@ class FirestoreService
             $collection = $this->db->collection('employees');
             $document = $collection->document($employeeUid);
             
-            if (!$document->snapshot()->exists()) {
+            try {
+                $snapshot = $document->snapshot();
+                if (!$snapshot->exists()) {
+                    throw new \Exception("Employee with UID {$employeeUid} not found in Firestore");
+                }
+            } catch (\Exception $e) {
+                Log::warning("Failed to check document existence for employee {$employeeUid}: " . $e->getMessage());
                 throw new \Exception("Employee with UID {$employeeUid} not found in Firestore");
             }
 

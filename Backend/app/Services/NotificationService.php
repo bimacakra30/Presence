@@ -336,19 +336,44 @@ class NotificationService
     public function sendToEmployeeWithFirestoreTokens($employeeUid, $title, $body, $data = [], $options = [])
     {
         try {
+            Log::info("NotificationService: Starting sendToEmployeeWithFirestoreTokens for employee {$employeeUid} with title '{$title}'");
+            
+            // Check for duplicate notification first
+            if ($this->isDuplicateNotification($employeeUid, $title, $data, $options)) {
+                Log::info("NotificationService: Duplicate notification prevented for employee {$employeeUid}: {$title}");
+                return true; // Return true to avoid retry
+            }
+            
+            Log::info("NotificationService: Proceeding with notification for employee {$employeeUid}: {$title}");
+
             $firestoreService = new \App\Services\FirestoreService();
             $fcmTokens = $firestoreService->getEmployeeFcmTokens($employeeUid);
             
             if (empty($fcmTokens)) {
                 Log::warning("No FCM tokens found for employee UID: {$employeeUid}");
+                
+                // Fallback: Create notification in database even without FCM token
+                $employee = \App\Models\Employee::where('uid', $employeeUid)->first();
+                if ($employee) {
+                    $notification = $this->createNotification($employee, $title, $body, $data, $options);
+                    Log::info("Created fallback notification in database for employee {$employeeUid}");
+                    return true;
+                }
                 return false;
             }
 
             $successCount = 0;
             $totalTokens = count($fcmTokens);
+            $sentTokens = []; // Track sent tokens to prevent duplicates
 
             foreach ($fcmTokens as $tokenData) {
                 $fcmToken = $tokenData['token'];
+                
+                // Skip if we've already sent to this token
+                if (in_array($fcmToken, $sentTokens)) {
+                    Log::info("Skipping duplicate token for employee {$employeeUid}: " . substr($fcmToken, 0, 20) . "...");
+                    continue;
+                }
                 
                 // Create notification record
                 $notification = $this->createNotificationFromToken($employeeUid, $title, $body, $data, $options, $fcmToken);
@@ -359,6 +384,7 @@ class NotificationService
                     
                     if ($result) {
                         $successCount++;
+                        $sentTokens[] = $fcmToken; // Track this token as sent
                         // Update last used timestamp
                         $firestoreService->updateFcmTokenLastUsed($employeeUid, $tokenData['id']);
                     }
@@ -549,5 +575,145 @@ class NotificationService
             Log::error("Failed to cleanup old FCM tokens from Firestore: " . $e->getMessage());
             return 0;
         }
+    }
+
+    /**
+     * Check if notification is duplicate based on recent notifications
+     */
+    protected function isDuplicateNotification($employeeUid, $title, $data = [], $options = [])
+    {
+        try {
+            // Create unique notification fingerprint
+            $notificationFingerprint = $this->createNotificationFingerprint($employeeUid, $title, $data, $options);
+            
+            // Check cache first (for immediate duplicate prevention)
+            $cacheKey = "notification_fingerprint:{$notificationFingerprint}";
+            if (Cache::has($cacheKey)) {
+                Log::info("Duplicate notification prevented via cache for employee {$employeeUid}: {$title}");
+                return true;
+            }
+
+            // Find employee by UID
+            $employee = \App\Models\Employee::where('uid', $employeeUid)->first();
+            if (!$employee) {
+                return false; // If employee not found, allow notification
+            }
+
+            // Check for duplicate in the last 15 minutes (increased for better coverage)
+            $fifteenMinutesAgo = now()->subMinutes(15);
+            
+            $query = Notification::where('recipient_type', Employee::class)
+                               ->where('recipient_id', $employee->id)
+                               ->where('title', $title)
+                               ->where('created_at', '>=', $fifteenMinutesAgo);
+
+            // Add additional checks based on notification type and data
+            if (isset($options['type'])) {
+                $query->where('type', $options['type']);
+            }
+
+            // Check for specific data fields that indicate uniqueness
+            if (isset($data['permit_id'])) {
+                $query->whereJsonContains('data->permit_id', $data['permit_id']);
+            }
+
+            if (isset($data['presence_id'])) {
+                $query->whereJsonContains('data->presence_id', $data['presence_id']);
+            }
+
+            if (isset($data['action'])) {
+                $query->whereJsonContains('data->action', $data['action']);
+            }
+
+            // Special handling for status change notifications
+            if (strpos($title, 'Status') !== false && isset($data['status'])) {
+                $query->whereJsonContains('data->status', $data['status']);
+                
+                // Also check for the same permit data (tanggal_mulai, tanggal_selesai, jenis_perizinan)
+                if (isset($data['tanggal_mulai'])) {
+                    $query->whereJsonContains('data->tanggal_mulai', $data['tanggal_mulai']);
+                }
+                if (isset($data['tanggal_selesai'])) {
+                    $query->whereJsonContains('data->tanggal_selesai', $data['tanggal_selesai']);
+                }
+                if (isset($data['jenis_perizinan'])) {
+                    $query->whereJsonContains('data->jenis_perizinan', $data['jenis_perizinan']);
+                }
+            }
+
+            // Check if similar notification exists
+            $duplicateCount = $query->count();
+            
+            if ($duplicateCount > 0) {
+                Log::info("Duplicate notification detected for employee {$employeeUid}: {$title} (count: {$duplicateCount})");
+                return true;
+            }
+
+            // Set cache to prevent immediate duplicates (10 minutes cache for status notifications)
+            $cacheDuration = strpos($title, 'Status') !== false ? 10 : 5;
+            Cache::put($cacheKey, true, now()->addMinutes($cacheDuration));
+            
+            return false;
+            
+        } catch (\Exception $e) {
+            Log::error("Error checking for duplicate notification: " . $e->getMessage());
+            return false; // If error occurs, allow notification to proceed
+        }
+    }
+
+    /**
+     * Create unique notification fingerprint for duplicate detection
+     */
+    protected function createNotificationFingerprint($employeeUid, $title, $data = [], $options = [])
+    {
+        $fingerprintData = [
+            'employee_uid' => $employeeUid,
+            'title' => $title,
+            'type' => $options['type'] ?? 'general',
+            'action' => $data['action'] ?? null,
+        ];
+        
+        // For permit notifications, include relevant data but exclude IDs that change
+        if (isset($options['type']) && $options['type'] === 'permit') {
+            $fingerprintData['jenis_perizinan'] = $data['jenis_perizinan'] ?? null;
+            $fingerprintData['tanggal_mulai'] = $data['tanggal_mulai'] ?? null;
+            $fingerprintData['tanggal_selesai'] = $data['tanggal_selesai'] ?? null;
+            
+            // For status change notifications, include status but exclude permit_id
+            if (strpos($title, 'Status') !== false && isset($data['status'])) {
+                $fingerprintData['status'] = $data['status'];
+                // Add a unique identifier for status change notifications
+                $fingerprintData['status_change'] = true;
+            }
+        }
+        
+        // For presence notifications, include relevant data but exclude IDs that change
+        if (isset($options['type']) && $options['type'] === 'presence') {
+            $fingerprintData['date'] = $data['date'] ?? null;
+        }
+        
+        // Remove null values to create consistent fingerprint
+        $fingerprintData = array_filter($fingerprintData, function($value) {
+            return $value !== null;
+        });
+        
+        return md5(json_encode($fingerprintData));
+    }
+
+    /**
+     * Create unique notification ID for tracking
+     */
+    protected function createNotificationId($employeeUid, $title, $data = [])
+    {
+        $uniqueData = [
+            'employee_uid' => $employeeUid,
+            'title' => $title,
+            'permit_id' => $data['permit_id'] ?? null,
+            'presence_id' => $data['presence_id'] ?? null,
+            'action' => $data['action'] ?? null,
+            'timestamp' => now()->timestamp
+        ];
+        
+        return md5(json_encode($uniqueData));
     }
 }
