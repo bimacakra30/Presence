@@ -62,10 +62,11 @@ dependencies:
 flutter_icons:
   android: true
   ios: true
-  image_path: "assets/images/app_logo.png"
+  image_path: "assets/images/ic_foreground.png"
   min_sdk_android: 21
-  adaptive_icon_background: "assets/images/app_logo.png"
-  adaptive_icon_foreground: "assets/images/app_logo.png"
+  adaptive_icon_background: "#E5E7EB"
+  adaptive_icon_foreground: "assets/images/ic_foreground.png"
+  adaptive_icon_monochrome: "assets/images/ic_monochrome.png"
 
 dev_dependencies:
   flutter_test:

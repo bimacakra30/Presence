@@ -33,19 +33,7 @@
             android:name="com.google.firebase.messaging.default_notification_channel_id"
             android:value="presensi_channel" />
 
-        <!-- BARU: Default Notification Icon untuk FCM -->
-        <!-- Dengan mengomentari ini, sistem Android cenderung menggunakan android:icon dari <application>
-             sebagai ikon notifikasi default jika tidak ada ikon spesifik yang disetel -->
-        <!-- Jika Anda benar-benar ingin mengaturnya secara eksplisit ke launcher icon: -->
-        <meta-data
-            android:name="com.google.firebase.messaging.default_notification_icon"
-            android:resource="@mipmap/ic_launcher" />
 
-
-        <!-- Default Notification Color -->
-        <meta-data
-            android:name="com.google.firebase.messaging.default_notification_color"
-            android:resource="@color/notification_color" />
 
     </application>
 
