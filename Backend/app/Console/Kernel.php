@@ -30,6 +30,25 @@ class Kernel extends ConsoleKernel
             ->daily()
             ->at('23:59')
             ->withoutOverlapping();
+        
+        // Start Firestore change listener on app startup
+        $schedule->command('employee:sync-realtime --start-listener')
+            ->daily()
+            ->at('00:00')
+            ->withoutOverlapping()
+            ->runInBackground();
+        
+        // Health check for listener every 30 minutes
+        $schedule->command('employee:sync-realtime --listener-status')
+            ->everyThirtyMinutes()
+            ->withoutOverlapping()
+            ->runInBackground();
+        
+        // Fallback sync every 6 hours (only if listener fails)
+        $schedule->command('employee:sync-realtime --force')
+            ->everySixHours()
+            ->withoutOverlapping()
+            ->runInBackground();
     }
 
     /**

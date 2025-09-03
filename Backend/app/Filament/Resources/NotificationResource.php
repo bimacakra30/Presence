@@ -21,6 +21,7 @@ class NotificationResource extends Resource
     protected static ?string $navigationIcon = 'heroicon-o-bell';
 
     protected static ?string $navigationGroup = 'Communication';
+    protected static ?string $navigationLabel = 'Push Notification';
 
     protected static ?int $navigationSort = 3;
 
@@ -68,11 +69,12 @@ class NotificationResource extends Resource
                     ->schema([
                         Forms\Components\Select::make('recipient_type')
                             ->options([
-                                'App\Models\Employee' => 'Employee',
-                                'App\Models\User' => 'User',
+                                'App\Models\Employee' => 'Employee (FCM Supported)',
+                                'App\Models\User' => 'User (Limited Support)',
                             ])
                             ->reactive()
-                            ->required(),
+                            ->required()
+                            ->helperText('Choose Employee for FCM push notifications'),
 
                         Forms\Components\Select::make('recipient_id')
                             ->label('Recipient')
@@ -80,12 +82,38 @@ class NotificationResource extends Resource
                                 $recipientType = $get('recipient_type');
                                 if (!$recipientType) return [];
 
-                                $model = new $recipientType;
-                                return $model::pluck('name', 'id')->toArray();
+                                if ($recipientType === 'App\Models\Employee') {
+                                    return \App\Models\Employee::whereNotNull('uid')
+                                        ->pluck('name', 'id')
+                                        ->toArray();
+                                } elseif ($recipientType === 'App\Models\User') {
+                                    return \App\Models\User::pluck('name', 'id')->toArray();
+                                }
+
+                                return [];
                             })
                             ->searchable()
-                            ->required()
-                            ->visible(fn (callable $get) => $get('recipient_type') !== null),
+                            ->required(fn (callable $get) => !$get('send_to_all_employees'))
+                            ->visible(fn (callable $get) => $get('recipient_type') !== null && !$get('send_to_all_employees'))
+                            ->helperText('Only employees with UID can receive FCM notifications')
+                            ->default(function (callable $get) {
+                                $recipientType = $get('recipient_type');
+                                if ($recipientType === 'App\Models\Employee') {
+                                    $firstEmployee = \App\Models\Employee::whereNotNull('uid')->where('status', 'aktif')->first();
+                                    return $firstEmployee ? $firstEmployee->id : null;
+                                }
+                                return null;
+                            }),
+
+                        Forms\Components\Toggle::make('send_to_all_employees')
+                            ->label('Send to All Employees')
+                            ->helperText('Send this notification to all active employees with UID')
+                            ->visible(fn (callable $get) => $get('recipient_type') === 'App\Models\Employee')
+                            ->reactive()
+                            ->afterStateUpdated(function (callable $set) {
+                                $set('recipient_id', null);
+                            })
+                            ->dehydrated(false), // Don't save to database, just use for logic
                     ])->columns(2),
 
                 Forms\Components\Section::make('Additional Options')
@@ -220,32 +248,80 @@ class NotificationResource extends Resource
                     ->label('Resend')
                     ->icon('heroicon-o-arrow-path')
                     ->color('warning')
-                    ->visible(fn (Notification $record): bool => $record->status === Notification::STATUS_FAILED)
+                    ->tooltip('Resend this notification to the recipient')
+                    ->visible(fn (Notification $record): bool => in_array($record->status, [Notification::STATUS_FAILED, Notification::STATUS_SENT]))
                     ->action(function (Notification $record) {
                         $notificationService = new NotificationService();
-                        $success = $notificationService->sendToRecipient(
-                            $record->recipient,
-                            $record->title,
-                            $record->body,
-                            $record->data ?? [],
-                            [
-                                'type' => $record->type,
-                                'priority' => $record->priority,
-                                'image_url' => $record->image_url,
-                                'action_url' => $record->action_url,
-                            ]
-                        );
+                        
+                        // Get recipient
+                        $recipient = $record->recipient;
+                        
+                        if (!$recipient) {
+                            FilamentNotification::make()
+                                ->title('Recipient Not Found')
+                                ->body('The recipient could not be found.')
+                                ->danger()
+                                ->send();
+                            return;
+                        }
+
+                        // Prepare data for FCM
+                        $data = $record->data ?? [];
+                        $data['action'] = 'manual_notification';
+                        $data['notification_id'] = $record->id;
+                        $data['created_via'] = 'filament_admin';
+                        $data['resent'] = true;
+
+                        $options = [
+                            'type' => $record->type,
+                            'priority' => $record->priority,
+                            'image_url' => $record->image_url,
+                            'action_url' => $record->action_url,
+                        ];
+
+                        // Send notification based on recipient type
+                        $success = false;
+                        if ($recipient instanceof \App\Models\Employee && $recipient->uid) {
+                            // Use Firestore tokens for employees
+                            $success = $notificationService->sendToEmployeeWithFirestoreTokens(
+                                $recipient->uid,
+                                $record->title,
+                                $record->body,
+                                $data,
+                                $options
+                            );
+                        } else {
+                            // Use regular method for users
+                            $success = $notificationService->sendToRecipient(
+                                $recipient,
+                                $record->title,
+                                $record->body,
+                                $data,
+                                $options
+                            );
+                        }
 
                         if ($success) {
+                            // Update notification status
+                            $record->update([
+                                'status' => Notification::STATUS_SENT,
+                                'sent_at' => now(),
+                            ]);
+                            
                             FilamentNotification::make()
                                 ->title('Notification Resent')
                                 ->body('The notification has been resent successfully.')
                                 ->success()
                                 ->send();
                         } else {
+                            // Update notification status
+                            $record->update([
+                                'status' => Notification::STATUS_FAILED,
+                            ]);
+                            
                             FilamentNotification::make()
                                 ->title('Resend Failed')
-                                ->body('Failed to resend the notification.')
+                                ->body('Failed to resend the notification. Check the logs for details.')
                                 ->danger()
                                 ->send();
                         }
@@ -283,22 +359,62 @@ class NotificationResource extends Resource
 
                             foreach ($records as $record) {
                                 if ($record->status === Notification::STATUS_FAILED) {
-                                    $success = $notificationService->sendToRecipient(
-                                        $record->recipient,
-                                        $record->title,
-                                        $record->body,
-                                        $record->data ?? [],
-                                        [
-                                            'type' => $record->type,
-                                            'priority' => $record->priority,
-                                            'image_url' => $record->image_url,
-                                            'action_url' => $record->action_url,
-                                        ]
-                                    );
+                                    // Get recipient
+                                    $recipient = $record->recipient;
+                                    
+                                    if (!$recipient) {
+                                        $failCount++;
+                                        continue;
+                                    }
+
+                                    // Prepare data for FCM
+                                    $data = $record->data ?? [];
+                                    $data['action'] = 'manual_notification';
+                                    $data['notification_id'] = $record->id;
+                                    $data['created_via'] = 'filament_admin';
+                                    $data['resent'] = true;
+
+                                    $options = [
+                                        'type' => $record->type,
+                                        'priority' => $record->priority,
+                                        'image_url' => $record->image_url,
+                                        'action_url' => $record->action_url,
+                                    ];
+
+                                    // Send notification based on recipient type
+                                    $success = false;
+                                    if ($recipient instanceof \App\Models\Employee && $recipient->uid) {
+                                        // Use Firestore tokens for employees
+                                        $success = $notificationService->sendToEmployeeWithFirestoreTokens(
+                                            $recipient->uid,
+                                            $record->title,
+                                            $record->body,
+                                            $data,
+                                            $options
+                                        );
+                                    } else {
+                                        // Use regular method for users
+                                        $success = $notificationService->sendToRecipient(
+                                            $recipient,
+                                            $record->title,
+                                            $record->body,
+                                            $data,
+                                            $options
+                                        );
+                                    }
 
                                     if ($success) {
+                                        // Update notification status
+                                        $record->update([
+                                            'status' => Notification::STATUS_SENT,
+                                            'sent_at' => now(),
+                                        ]);
                                         $successCount++;
                                     } else {
+                                        // Update notification status
+                                        $record->update([
+                                            'status' => Notification::STATUS_FAILED,
+                                        ]);
                                         $failCount++;
                                     }
                                 }

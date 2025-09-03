@@ -4,6 +4,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\NotificationMonitoringController;
+use App\Http\Controllers\Api\RealTimeSyncController;
 
 /*
 |--------------------------------------------------------------------------
@@ -78,4 +79,27 @@ Route::middleware(['auth:sanctum'])->group(function () {
     
     // Alerts and recommendations
     Route::get('/monitoring/alerts', [NotificationMonitoringController::class, 'alerts']);
+});
+
+// Real-time sync routes (protected by auth)
+Route::middleware(['auth:sanctum'])->group(function () {
+    // Get sync status
+    Route::get('/realtime-sync/status', [RealTimeSyncController::class, 'getStatus']);
+    
+    // Trigger manual sync
+    Route::post('/realtime-sync/trigger', [RealTimeSyncController::class, 'triggerSync']);
+    
+    // Set sync interval
+    Route::post('/realtime-sync/interval', [RealTimeSyncController::class, 'setInterval']);
+    
+    // Get sync statistics
+    Route::get('/realtime-sync/stats', [RealTimeSyncController::class, 'getStats']);
+    
+    // Firestore change listener management
+    Route::post('/realtime-sync/listener/start', [RealTimeSyncController::class, 'startListener']);
+    Route::post('/realtime-sync/listener/stop', [RealTimeSyncController::class, 'stopListener']);
+    Route::get('/realtime-sync/listener/status', [RealTimeSyncController::class, 'getListenerStatus']);
+    
+    // Simulate Firestore change for testing
+    Route::post('/realtime-sync/simulate-change', [RealTimeSyncController::class, 'simulateChange']);
 });

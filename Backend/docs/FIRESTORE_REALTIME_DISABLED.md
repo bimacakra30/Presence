@@ -113,3 +113,6 @@ LIVEWIRE_POLL_INTERVAL=30000
 Konfigurasi ini memberikan keseimbangan yang baik antara performa, biaya, dan fungsionalitas. Realtime read dinonaktifkan untuk mengoptimalkan performa dan mengurangi biaya, sementara tetap mempertahankan semua fitur penting termasuk login dan operasi CRUD.
 
 
+
+
+

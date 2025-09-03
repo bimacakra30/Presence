@@ -124,6 +124,62 @@ class FirestoreService
     }
 
     /**
+     * Get minimal user data from Firestore to reduce read operations
+     * Only fetches essential fields needed for sync comparison
+     */
+    public function getUsersMinimal($useCache = true)
+    {
+        $cacheKey = 'firestore_employees_minimal';
+        
+        if ($useCache && Cache::has($cacheKey)) {
+            return Cache::get($cacheKey);
+        }
+
+        try {
+            $users = [];
+            $collection = $this->db->collection('employees');
+            $documents = $collection->orderBy('createdAt', 'DESC')->documents();
+
+            foreach ($documents as $document) {
+                if ($document->exists()) {
+                    $data = $document->data();
+                    $uid = $document->id();
+                    
+                    // Only fetch essential fields to minimize Firestore reads
+                    $minimalData = [
+                        'uid' => $uid,
+                        'name' => $data['name'] ?? null,
+                        'email' => $data['email'] ?? null,
+                        'phone' => $data['phone'] ?? null,
+                        'address' => $data['address'] ?? null,
+                        'status' => $data['status'] ?? null,
+                        'position' => $data['position'] ?? null,
+                        'profilePictureUrl' => $data['profilePictureUrl'] ?? null,
+                        'dateOfBirth' => $data['dateOfBirth'] ?? null
+                    ];
+                    
+                    $users[] = $minimalData;
+                }
+            }
+
+            // Cache minimal data for better performance
+            if ($useCache) {
+                Cache::put($cacheKey, $users, now()->addSeconds($this->cacheTimeout));
+            }
+
+            Log::info('Retrieved minimal user data from Firestore', [
+                'count' => count($users),
+                'fields_per_user' => count($minimalData)
+            ]);
+
+            return $users;
+        } catch (\Exception $e) {
+            Log::error('Failed to get minimal users from Firestore: ' . $e->getMessage());
+            return [];
+        }
+    }
+
+    /**
      * Get specific user by ID
      */
     public function getUser($id)
