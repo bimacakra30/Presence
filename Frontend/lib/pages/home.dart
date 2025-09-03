@@ -11,7 +11,7 @@ import '../utils/cloudinary_service.dart';
 import '../components/home_widgets.dart';
 import '../utils/presensi_utils.dart';
 import '../utils/holidays.dart';
-import '../utils/notification_utils.dart';
+import '../utils/customSnackBar_utils.dart';
 import '../components/maps_location_widget.dart';
 import 'settings_page.dart';
 import 'permit_page.dart';
@@ -320,6 +320,8 @@ class _HomePageState extends State<HomePage> {
       final prefs = await SharedPreferences.getInstance();
       final uid =
           FirebaseAuth.instance.currentUser?.uid ?? prefs.getString('uid');
+      final name =
+          prefs.getString('name') ?? prefs.getString('username') ?? 'Pengguna';
       if (uid == null) {
         showCustomSnackBar(
           context,
@@ -339,7 +341,7 @@ class _HomePageState extends State<HomePage> {
 
       await _handleAttendance(
         uid: uid,
-        username: username,
+        name: name,
         imageUrl: uploadResult['url'],
         publicId: uploadResult['public_id'],
         now: now,
@@ -361,7 +363,7 @@ class _HomePageState extends State<HomePage> {
 
   Future<void> _handleAttendance({
     required String uid,
-    required String username,
+    required String name,
     required String imageUrl,
     required String publicId,
     required DateTime now,
@@ -392,7 +394,7 @@ class _HomePageState extends State<HomePage> {
 
         await presenceRef.add({
           'uid': uid,
-          'name': username,
+          'name': name,
           'date': todayStart.toIso8601String(),
           'clockIn': now.toIso8601String(),
           'fotoClockIn': imageUrl,
