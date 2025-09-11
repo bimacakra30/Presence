@@ -51,8 +51,7 @@ dependencies:
   flutter_map: ^8.1.1
   latlong2: ^0.9.1
   geolocator: ^14.0.2
-  table_calendar: any
-  flutter_launcher_icons: any
+  table_calendar: ^3.1.2
   connectivity_plus: ^6.1.5
   firebase_messaging: ^15.2.9
   flutter_local_notifications: ^17.1.2
@@ -81,6 +80,7 @@ dev_dependencies:
   # package. See that file for information about deactivating specific lint
   # rules and activating additional ones.
   flutter_lints: ^6.0.0
+  flutter_launcher_icons: ^0.14.3
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
