@@ -1,4 +1,6 @@
-import 'dart:io';
+import 'dart:io' show File;
+import 'dart:typed_data';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
@@ -25,6 +27,8 @@ class _PermitPageState extends State<PermitPage> with TickerProviderStateMixin {
   DateTime? _startDate;
   DateTime? _endDate;
   File? _proofFile;
+  Uint8List? _proofBytes; // web
+  String? _proofFilename; // web
   String _username = '';
   bool _isLoading = false;
   
@@ -160,9 +164,20 @@ class _PermitPageState extends State<PermitPage> with TickerProviderStateMixin {
       );
       
       if (pickedFile != null) {
-        setState(() {
-          _proofFile = File(pickedFile.path);
-        });
+        if (kIsWeb) {
+          final bytes = await pickedFile.readAsBytes();
+          setState(() {
+            _proofBytes = bytes;
+            _proofFilename = pickedFile.name;
+            _proofFile = null;
+          });
+        } else {
+          setState(() {
+            _proofFile = File(pickedFile.path);
+            _proofBytes = null;
+            _proofFilename = null;
+          });
+        }
         
         // Show success feedback
         ScaffoldMessenger.of(context).showSnackBar(
@@ -285,8 +300,12 @@ class _PermitPageState extends State<PermitPage> with TickerProviderStateMixin {
       String? imageUrl;
       String? publicId;
 
-      if (_proofFile != null) {
-        final uploadResult = await uploadPermitProof(proofFile: _proofFile!);
+      if (_proofFile != null || _proofBytes != null) {
+        final uploadResult = await uploadPermitProof(
+          proofFile: _proofFile,
+          proofBytes: _proofBytes,
+          filename: _proofFilename,
+        );
         if (uploadResult != null) {
           imageUrl = uploadResult['url'];
           publicId = uploadResult['public_id'];

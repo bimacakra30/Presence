@@ -2,12 +2,17 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:device_info_plus/device_info_plus.dart';
-import 'dart:io';
+import 'package:flutter/foundation.dart' show kIsWeb;
+import 'dart:io' show Platform;
 
 /// Menyimpan atau memperbarui token FCM pengguna saat ini di sub-koleksi 'fcmTokens'
 /// di bawah dokumen karyawan di Firestore.
 /// Ini memungkinkan satu karyawan memiliki banyak token (satu per perangkat).
 Future<void> saveEmployeeFcmTokenToFirestore() async {
+  if (kIsWeb) {
+    // Di web kita tidak membutuhkan dan tidak menyimpan FCM token
+    return;
+  }
   final String? fcmToken = await FirebaseMessaging.instance.getToken();
   final String? userId = FirebaseAuth.instance.currentUser?.uid;
 

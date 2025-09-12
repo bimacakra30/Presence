@@ -1,4 +1,6 @@
-import 'dart:io';
+import 'dart:io' show File;
+import 'dart:typed_data';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart';
@@ -6,12 +8,24 @@ import './cloudinary_service.dart';
 
 // Fungsi untuk mengunggah bukti perizinan ke Cloudinary
 Future<Map<String, String>?> uploadPermitProof({
-  required File proofFile,
+  File? proofFile,
+  Uint8List? proofBytes,
+  String? filename,
 }) async {
   try {
-    final uploadResult = await CloudinaryService.uploadImageToCloudinary(
-      proofFile,
-    );
+    Map<String, dynamic>? uploadResult;
+    if (kIsWeb) {
+      if (proofBytes == null) return null;
+      uploadResult = await CloudinaryService.uploadImageBytesToCloudinary(
+        proofBytes,
+        filename ?? 'proof.jpg',
+      );
+    } else {
+      if (proofFile == null) return null;
+      uploadResult = await CloudinaryService.uploadImageToCloudinary(
+        proofFile,
+      );
+    }
     if (uploadResult != null) {
       return {
         'url': uploadResult['url'],

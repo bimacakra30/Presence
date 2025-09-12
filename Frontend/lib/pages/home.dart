@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
@@ -308,10 +309,17 @@ class _HomePageState extends State<HomePage> {
         return;
       }
       showCustomSnackBar(context, 'Mengupload foto.....');
-      final file = File(photo.path);
-      final uploadResult = await CloudinaryService.uploadImageToCloudinary(
-        file,
-      );
+      Map<String, dynamic>? uploadResult;
+      if (kIsWeb) {
+        final bytes = await photo.readAsBytes();
+        uploadResult = await CloudinaryService.uploadImageBytesToCloudinary(
+          bytes,
+          photo.name,
+        );
+      } else {
+        final file = File(photo.path);
+        uploadResult = await CloudinaryService.uploadImageToCloudinary(file);
+      }
       if (uploadResult == null || uploadResult['url'] == null) {
         showCustomSnackBar(context, 'Gagal upload Foto', isError: true);
         return;
