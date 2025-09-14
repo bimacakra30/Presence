@@ -13,11 +13,20 @@ return new class extends Migration
     {
         Schema::create('users', function (Blueprint $table) {
             $table->id();
-            $table->string('name');
-            $table->string('email')->unique();
-            $table->string('password');
-            $table->rememberToken();
-            $table->timestamps();
+            $table->string('photo')->nullable(); // Foto profil admin
+            $table->string('name'); // Nama lengkap admin
+            $table->string('email')->unique(); // Email unik untuk login
+            $table->timestamp('email_verified_at')->nullable(); // Verifikasi email
+            $table->string('password'); // Password ter-hash
+            $table->enum('role', ['superadmin', 'admin'])->default('admin'); // Role admin
+            $table->enum('status', ['active', 'inactive'])->default('active'); // Status akun
+            $table->rememberToken(); // Token untuk remember me
+            $table->timestamps(); // created_at, updated_at
+            
+            // Indexes untuk performa
+            $table->index('email');
+            $table->index('role');
+            $table->index('status');
         });
 
         Schema::create('password_reset_tokens', function (Blueprint $table) {

@@ -19,10 +19,10 @@ class ChangePassword extends Page
 {
     protected static ?string $navigationIcon = 'heroicon-o-lock-closed';
     protected static ?string $navigationLabel = 'Ubah Password';
-    protected static ?string $navigationGroup = 'Pengaturan';
+    protected static ?string $navigationGroup = 'Pengaturan Akun & Keamanan';
     protected static string $view = 'filament.pages.change-password';
     protected static ?string $title = 'Ubah Password';
-    protected static ?int $navigationSort = 2;
+    protected static ?int $navigationSort = 3;
 
     public ?array $passwordData = [];
 

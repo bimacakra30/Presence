@@ -44,30 +44,20 @@ class ListPresences extends ListRecords
                 ->modalButton('Muat Ulang')
                 ->action(function () {
                     $service = new FirestoreService();
-                    $absensiData = $service->getAbsensi();
-
-                    foreach ($absensiData as $absen) {
-                        Presence::updateOrCreate(
-                            [
-                                'firestore_id' => $absen['firestore_id'] ?? null,
-                                'uid' => $absen['uid'] ?? '',
-                                'tanggal' => Carbon::parse($absen['date'] ?? now())->toDateString(),
-                            ],
-                            [
-                                'nama' => $absen['name'] ?? '',
-                                'clock_in' => isset($absen['clockIn']) ? Carbon::parse($absen['clockIn']) : null,
-                                'public_id_clock_in' => $absen['fotoClockInPublicId'] ?? null,
-                                'public_id_clock_out' => $absen['fotoClockOutPublicId'] ?? null,
-                                'clock_out' => isset($absen['clockOut']) ? Carbon::parse($absen['clockOut']) : null,
-                                'foto_clock_in' => $absen['fotoClockIn'] ?? null,
-                                'foto_clock_out' => $absen['fotoClockOut'] ?? null,
-                                'status' => $absen['late'] ?? true,
-                                'durasi_keterlambatan' => $absen['lateDuration'] ?? null,
-                            ]
-                        );
-                    }
+                    $syncService = new \App\Services\ActivePresenceSyncService($service);
+                    
+                    // Use the proper sync service instead of manual updateOrCreate
+                    $results = $syncService->forceSync();
+                    
+                    $message = "Data presensi berhasil disinkronkan!\n";
+                    $message .= "Dibuat: {$results['created']}\n";
+                    $message .= "Diperbarui: {$results['updated']}\n";
+                    $message .= "Dilewati: {$results['skipped']}\n";
+                    $message .= "Error: {$results['errors']}";
+                    
                     Notification::make()
                         ->title('Data presensi berhasil disinkronkan!')
+                        ->body($message)
                         ->success()
                         ->send();
                 }),

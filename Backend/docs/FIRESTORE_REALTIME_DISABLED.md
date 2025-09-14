@@ -116,3 +116,10 @@ Konfigurasi ini memberikan keseimbangan yang baik antara performa, biaya, dan fu
 
 
 
+
+
+
+
+
+
+

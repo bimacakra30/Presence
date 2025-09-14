@@ -24,7 +24,21 @@ class Presence extends Model
         'public_id_clock_in',
         'public_id_clock_out',
         'status',
-        'durasi_keterlambatan'
+        'durasi_keterlambatan',
+        'early_clock_out',
+        'early_clock_out_reason',
+        'location_name'
+    ];
+
+    /**
+     * The attributes that should be cast.
+     */
+    protected $casts = [
+        'early_clock_out' => 'boolean',
+        'status' => 'boolean',
+        'tanggal' => 'date',
+        'clock_in' => 'datetime',
+        'clock_out' => 'datetime',
     ];
 
     protected static function booted()
@@ -34,8 +48,9 @@ class Presence extends Model
             Log::debug("Memulai penghapusan Presence ID: {$presence->id}, Firestore ID: {$presence->firestore_id}");
             if ($presence->firestore_id) {
                 try {
-                    $service = new \App\Services\FirestoreService();
-                    $service->deleteAbsensi($presence->firestore_id);
+                    $firestoreService = new \App\Services\FirestoreService();
+                    $presenceSyncService = new \App\Services\PresenceSyncService($firestoreService);
+                    $presenceSyncService->deletePresenceFromFirestore($presence->firestore_id);
                     Log::info("Berhasil menghapus data Firestore dengan ID: {$presence->firestore_id}");
                 } catch (\Exception $e) {
                     Log::error("Gagal menghapus data Firestore: {$presence->firestore_id}, Error: {$e->getMessage()}");

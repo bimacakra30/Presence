@@ -20,9 +20,9 @@ class Profile extends Page
 {
     protected static ?string $navigationIcon = 'heroicon-o-user-circle';
     protected static ?string $navigationLabel = 'Informasi Akun';
-    protected static ?string $navigationGroup = 'Pengaturan';
+    protected static ?string $navigationGroup = 'Pengaturan Akun & Keamanan';
     protected static string $view = 'filament.pages.profile';
-    protected static ?int $navigationSort = 1;
+    protected static ?int $navigationSort = 2;
     
     public ?array $profileData = [];
     

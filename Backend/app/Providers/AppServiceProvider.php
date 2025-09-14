@@ -26,5 +26,10 @@ class AppServiceProvider extends ServiceProvider
         // Register observers
         Presence::observe(PresenceObserver::class);
         Permit::observe(PermitObserver::class);
+        
+        // Force HTTPS for ngrok
+        if (env('APP_ENV') === 'local' && str_contains(env('APP_URL'), 'ngrok')) {
+            \Illuminate\Support\Facades\URL::forceScheme('https');
+        }
     }
 }

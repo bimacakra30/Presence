@@ -40,6 +40,11 @@ class AdminPanelProvider extends PanelProvider
             ])
             ->discoverResources(in: app_path('Filament/Resources'), for: 'App\\Filament\\Resources')
             ->discoverPages(in: app_path('Filament/Pages'), for: 'App\\Filament\\Pages')
+            ->navigationGroups([
+                'Manajemen Karyawan & Perizinan',
+                'Lokasi', 
+                'Pengaturan',
+            ])
             ->pages([
                 Pages\Dashboard::class,
             ])

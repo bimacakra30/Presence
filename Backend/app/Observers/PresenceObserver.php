@@ -3,17 +3,9 @@
 namespace App\Observers;
 
 use App\Models\Presence;
-use App\Services\NotificationService;
-use App\Models\Notification;
 
 class PresenceObserver
 {
-    protected $notificationService;
-
-    public function __construct(NotificationService $notificationService)
-    {
-        $this->notificationService = $notificationService;
-    }
 
     /**
      * Handle the Presence "created" event.

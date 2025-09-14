@@ -18,9 +18,10 @@ use Filament\Tables\Filters\Filter;
 class PresenceResource extends Resource
 {
     protected static ?string $model = Presence::class;
-    protected static ?string $navigationGroup = 'Presensi & Perizinan';
+    protected static ?string $navigationGroup = 'Manajemen Karyawan & Perizinan';
     protected static ?string $navigationBadgeTooltip = 'Jumlah Presensi Karyawan';
     protected static ?string $navigationLabel = 'Presensi Karyawan';
+    protected static ?int $navigationSort = 2;
     protected static ?string $navigationIcon = 'heroicon-o-clipboard-document-check';
 
     public static function form(Form $form): Form
@@ -76,6 +77,22 @@ class PresenceResource extends Resource
                             }
                         }
                     }),
+                Forms\Components\TextInput::make('durasi_keterlambatan')
+                    ->label('Durasi Keterlambatan')
+                    ->maxLength(255),
+                Forms\Components\Toggle::make('status')
+                    ->label('Status Hadir')
+                    ->default(true),
+                Forms\Components\Toggle::make('early_clock_out')
+                    ->label('Pulang Lebih Awal')
+                    ->default(false),
+                Forms\Components\TextInput::make('early_clock_out_reason')
+                    ->label('Alasan Pulang Lebih Awal')
+                    ->maxLength(255)
+                    ->visible(fn ($get) => $get('early_clock_out')),
+                Forms\Components\TextInput::make('location_name')
+                    ->label('Nama Lokasi')
+                    ->maxLength(255),
             ]);
     }
 
@@ -110,6 +127,21 @@ class PresenceResource extends Resource
                 Tables\Columns\TextColumn::make('durasi_keterlambatan')
                     ->label('Durasi Keterlambatan')
                     ->sortable(),
+                Tables\Columns\IconColumn::make('early_clock_out')
+                    ->label('Pulang Lebih Awal')
+                    ->boolean()
+                    ->sortable()
+                    ->toggleable(),
+                Tables\Columns\TextColumn::make('early_clock_out_reason')
+                    ->label('Alasan Pulang Lebih Awal')
+                    ->searchable()
+                    ->toggleable()
+                    ->limit(30),
+                Tables\Columns\TextColumn::make('location_name')
+                    ->label('Lokasi')
+                    ->searchable()
+                    ->toggleable()
+                    ->limit(40),
                 Tables\Columns\TextColumn::make('created_at')
                     ->dateTime()
                     ->sortable()
@@ -141,6 +173,24 @@ class PresenceResource extends Resource
                             $indicator .= ($indicator ? ' - ' : '') . 'Sampai: ' . $data['tanggal_sampai'];
                         }
                         return $indicator ?: null;
+                    }),
+                Filter::make('early_clock_out')
+                    ->label('Pulang Lebih Awal')
+                    ->query(fn ($query) => $query->where('early_clock_out', true)),
+                Filter::make('location')
+                    ->form([
+                        Forms\Components\TextInput::make('location_name')
+                            ->label('Nama Lokasi')
+                            ->placeholder('Masukkan nama lokasi...')
+                    ])
+                    ->query(function ($query, array $data) {
+                        return $query->when(
+                            $data['location_name'],
+                            fn ($query, $location) => $query->where('location_name', 'like', "%{$location}%")
+                        );
+                    })
+                    ->indicateUsing(function (array $data): ?string {
+                        return $data['location_name'] ? 'Lokasi: ' . $data['location_name'] : null;
                     }),
             ])
             ->actions([

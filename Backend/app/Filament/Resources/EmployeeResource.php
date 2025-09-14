@@ -19,9 +19,10 @@ use Illuminate\Support\Facades\Log;
 class EmployeeResource extends Resource
 {
     protected static ?string $model = Employee::class;
-    protected static ?string $navigationGroup = 'Management';
+    protected static ?string $navigationGroup = 'Manajemen Karyawan & Perizinan';
     protected static ?string $navigationBadgeTooltip = 'Jumlah Karyawan';
     protected static ?string $navigationLabel = 'Karyawan';
+    protected static ?int $navigationSort = 1;
     protected static ?string $navigationIcon = 'heroicon-o-users';
 
     public static function form(Form $form): Form
@@ -109,9 +110,7 @@ class EmployeeResource extends Resource
                 Forms\Components\DatePicker::make('date_of_birth')
                     ->label('Date of Birth')
                     ->disabled(fn ($context) => $context === 'edit')
-                    ->nullable()
-                    ->maxDate(now()->subYears(17))
-                    ->helperText('Employee must be at least 17 years old'),
+                    ->nullable(),
 
                 Forms\Components\TextInput::make('position')
                     ->label('Jabatan')
@@ -152,43 +151,22 @@ class EmployeeResource extends Resource
     {
         return $table
             ->columns([
-                Tables\Columns\TextColumn::make('photo_display')
+                Tables\Columns\ImageColumn::make('photo')
                     ->label('Photo')
-                    ->html()
+                    ->circular()
+                    ->defaultImageUrl(fn ($record) => 'https://ui-avatars.com/api/?name=' . urlencode($record->name ?? '') . '&color=7F9CF5&background=EBF4FF')
                     ->getStateUsing(function ($record) {
-                        // Priority: profilePictureUrl (from sync) > photo (local) > initials
-                        $photoUrl = $record->profilePictureUrl ?? $record->photo ?? null;
-                        
-                        if ($photoUrl) {
-                            // Check if it's a full URL or local path
-                            if (filter_var($photoUrl, FILTER_VALIDATE_URL)) {
-                                $displayUrl = $photoUrl;
+                        // Try proxy first, fallback to original URL
+                        if ($record->photo) {
+                            if (filter_var($record->photo, FILTER_VALIDATE_URL)) {
+                                // Use proxy for external URLs
+                                return route('image.proxy', ['url' => $record->photo]);
                             } else {
                                 // Local storage path
-                                $displayUrl = asset('storage/' . $photoUrl);
+                                return asset('storage/' . $record->photo);
                             }
-                            
-                            return '<div class="flex justify-center">
-                                        <img src="' . $displayUrl . '" 
-                                             alt="Photo" 
-                                             class="w-10 h-10 rounded-full object-cover border-2 border-gray-200 shadow-sm hover:scale-110 transition-transform duration-200"
-                                             onerror="this.style.display=\'none\'; this.nextElementSibling.style.display=\'flex\';"
-                                             loading="lazy">
-                                        <div class="w-10 h-10 rounded-full bg-gray-500 flex items-center justify-center text-white font-semibold text-sm border-2 border-gray-200 shadow-sm" style="display:none;">
-                                            ' . static::generateInitials($record->name ?? '') . '
-                                        </div>
-                                    </div>';
                         }
-                        
-                        // Generate initials if no photo
-                        $initials = static::generateInitials($record->name ?? '');
-                        $bgColor = static::generateBackgroundColor($record->name ?? '');
-                        
-                        return '<div class="flex justify-center">
-                                    <div class="w-10 h-10 rounded-full ' . $bgColor . ' flex items-center justify-center text-white font-semibold text-sm border-2 border-gray-200 shadow-sm hover:scale-110 transition-transform duration-200">
-                                        ' . $initials . '
-                                    </div>
-                                </div>';
+                        return null;
                     }),
 
                 Tables\Columns\TextColumn::make('name')
@@ -406,6 +384,41 @@ class EmployeeResource extends Resource
                         }
                     }),
 
+                Tables\Actions\Action::make('sync_from_firestore')
+                    ->label('Sync from Firestore')
+                    ->icon('heroicon-o-arrow-down-on-square')
+                    ->color('info')
+                    ->visible(fn ($record): bool => !empty($record->uid))
+                    ->requiresConfirmation()
+                    ->modalHeading('Sync Employee from Firestore')
+                    ->modalDescription('This will sync this employee with the latest data from Firestore.')
+                    ->action(function ($record) {
+                        try {
+                            $firestoreSyncService = new \App\Services\FirestoreSyncService();
+                            $result = $firestoreSyncService->syncEmployeeByUid($record->uid);
+                            
+                            $message = match($result['action']) {
+                                'created' => 'Employee created from Firestore',
+                                'updated' => 'Employee updated from Firestore',
+                                'no_change' => 'Employee is already up to date',
+                                default => 'Employee synced from Firestore'
+                            };
+
+                            Notification::make()
+                                ->title('Sync Completed')
+                                ->body($message . ': ' . $record->name)
+                                ->success()
+                                ->send();
+                        } catch (\Exception $e) {
+                            Log::error('Manual sync from Firestore failed: ' . $e->getMessage());
+                            Notification::make()
+                                ->title('Failed to sync from Firestore')
+                                ->body($e->getMessage())
+                                ->danger()
+                                ->send();
+                        }
+                    }),
+
                 Tables\Actions\DeleteAction::make()
                     ->requiresConfirmation()
                     ->modalHeading('Delete Employee')
@@ -480,6 +493,84 @@ class EmployeeResource extends Resource
                         } catch (\Exception $e) {
                             Notification::make()
                                 ->title('Sync Failed')
+                                ->body($e->getMessage())
+                                ->danger()
+                                ->send();
+                        }
+                    }),
+
+                Tables\Actions\Action::make('full_sync_from_firestore')
+                    ->label('Full Sync from Firestore')
+                    ->icon('heroicon-o-arrow-path')
+                    ->color('warning')
+                    ->requiresConfirmation()
+                    ->modalHeading('Full Sync from Firestore')
+                    ->modalDescription('This will sync all employees from Firestore and clean up deleted employees.')
+                    ->action(function () {
+                        try {
+                            $firestoreSyncService = new \App\Services\FirestoreSyncService();
+                            $result = $firestoreSyncService->fullSync();
+                            
+                            Notification::make()
+                                ->title('Full Sync Completed')
+                                ->body("Synced: {$result['synced']}, Created: {$result['created']}, Updated: {$result['updated']}, Deleted: {$result['deleted']}, Errors: " . count($result['errors']))
+                                ->success()
+                                ->send();
+
+                            if (!empty($result['errors'])) {
+                                foreach ($result['errors'] as $error) {
+                                    Log::error("Sync error for {$error['user']}: {$error['error']}");
+                                }
+                            }
+                        } catch (\Exception $e) {
+                            Notification::make()
+                                ->title('Full Sync Failed')
+                                ->body($e->getMessage())
+                                ->danger()
+                                ->send();
+                        }
+                    }),
+
+                Tables\Actions\Action::make('dry_run_sync')
+                    ->label('Dry Run Sync')
+                    ->icon('heroicon-o-eye')
+                    ->color('gray')
+                    ->action(function () {
+                        try {
+                            $firestoreSyncService = new \App\Services\FirestoreSyncService();
+                            $firestoreService = new FirestoreService();
+                            
+                            $firestoreUsers = $firestoreService->getUsers(false);
+                            $localEmployees = \App\Models\Employee::all()->keyBy('uid');
+
+                            $toCreate = 0;
+                            $toUpdate = 0;
+                            $noChange = 0;
+
+                            foreach ($firestoreUsers as $firestoreUser) {
+                                $uid = $firestoreUser['uid'] ?? null;
+                                $localEmployee = $localEmployees->get($uid);
+
+                                if (!$localEmployee) {
+                                    $toCreate++;
+                                } else {
+                                    $syncData = $this->prepareEmployeeDataForComparison($firestoreUser);
+                                    if ($this->hasDataChanges($localEmployee, $syncData)) {
+                                        $toUpdate++;
+                                    } else {
+                                        $noChange++;
+                                    }
+                                }
+                            }
+
+                            Notification::make()
+                                ->title('Dry Run Results')
+                                ->body("To Create: {$toCreate}, To Update: {$toUpdate}, No Changes: {$noChange}")
+                                ->info()
+                                ->send();
+                        } catch (\Exception $e) {
+                            Notification::make()
+                                ->title('Dry Run Failed')
                                 ->body($e->getMessage())
                                 ->danger()
                                 ->send();
@@ -568,5 +659,46 @@ class EmployeeResource extends Resource
         return [
             StatsOverview::class,
         ];
+    }
+
+    /**
+     * Prepare employee data for comparison
+     */
+    protected function prepareEmployeeDataForComparison(array $firestoreUser): array
+    {
+        return [
+            'name' => $firestoreUser['name'] ?? '',
+            'username' => $firestoreUser['username'] ?? '',
+            'email' => $firestoreUser['email'] ?? '',
+            'phone' => $firestoreUser['phone'] ?? '',
+            'address' => $firestoreUser['address'] ?? '',
+            'position' => $firestoreUser['position'] ?? '',
+            'status' => $firestoreUser['status'] ?? '',
+            'provider' => $firestoreUser['provider'] ?? '',
+            'photo' => $firestoreUser['profilePictureUrl'] ?? '',
+            'date_of_birth' => !empty($firestoreUser['dateOfBirth']) ? $firestoreUser['dateOfBirth'] : null,
+        ];
+    }
+
+    /**
+     * Check if there are data changes
+     */
+    protected function hasDataChanges($employee, array $newData): bool
+    {
+        $fieldsToCheck = ['name', 'username', 'email', 'phone', 'address', 'position', 'status', 'provider', 'photo'];
+
+        foreach ($fieldsToCheck as $field) {
+            $currentValue = $employee->getAttribute($field);
+            $newValue = $newData[$field] ?? null;
+
+            if (empty($currentValue)) $currentValue = null;
+            if (empty($newValue)) $newValue = null;
+
+            if ($currentValue !== $newValue) {
+                return true;
+            }
+        }
+
+        return false;
     }
 }

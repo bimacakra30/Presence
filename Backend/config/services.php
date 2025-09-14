@@ -34,9 +34,5 @@ return [
         ],
     ],
 
-    'fcm' => [
-        'project_id' => env('FIREBASE_PROJECT_ID'),
-        'credentials_path' => env('FIREBASE_CREDENTIALS', storage_path('app/firebase/firebase_credentials.json')),
-    ],
 
 ];

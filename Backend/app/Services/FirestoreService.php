@@ -452,8 +452,28 @@ class FirestoreService
 
     public function deleteAbsensi($documentId)
     {
-        $collection = $this->db->collection('presence');
-        $collection->document($documentId)->delete();
+        try {
+            Log::info("Attempting to delete presence document from Firestore: {$documentId}");
+            
+            // Menggunakan collection 'presence' langsung
+            $collection = $this->db->collection('presence');
+            $document = $collection->document($documentId);
+            
+            // Check if document exists before deleting
+            $snapshot = $document->snapshot();
+            if (!$snapshot->exists()) {
+                Log::warning("Document {$documentId} does not exist in Firestore collection 'presence'");
+                return false;
+            }
+            
+            $document->delete();
+            Log::info("Successfully deleted presence document from Firestore: {$documentId}");
+            
+            return true;
+        } catch (\Exception $e) {
+            Log::error("Failed to delete presence document from Firestore: {$documentId}, Error: " . $e->getMessage());
+            throw $e;
+        }
     }
 
     public function getCollectionPosition()

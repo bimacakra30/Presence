@@ -26,7 +26,6 @@ class Employee extends Model
         'status',
         'provider',
         'firestore_id',
-        'fcm_token',
     ];
 
     protected $hidden = [
@@ -71,7 +70,7 @@ class Employee extends Model
                 'phone' => $employee->phone,
                 'password' => Hash::make($employee->plainPassword), // Hash password untuk Firestore
                 'address' => $employee->address,
-                'dateOfBirth' => $employee->date_of_birth,
+                'dateOfBirth' => $employee->date_of_birth ? (is_string($employee->date_of_birth) ? $employee->date_of_birth : $employee->date_of_birth->toISOString()) : null,
                 'position' => $employee->position,
                 'status' => $employee->status,
                 'provider' => $employee->provider,
@@ -122,18 +121,27 @@ class Employee extends Model
 
         // Update
         static::updated(function ($employee) {
-            if ($employee->firestore_id) {
+            if ($employee->uid) {
                 $service = new \App\Services\FirestoreService();
 
                 $data = [
+                    'uid' => $employee->uid, // Pastikan UID tetap sama
+                    'name' => $employee->name,
+                    'username' => $employee->username,
                     'email' => $employee->email,
-                    'status' => $employee->status,
+                    'phone' => $employee->phone,
+                    'address' => $employee->address,
+                    'dateOfBirth' => $employee->date_of_birth ? (is_string($employee->date_of_birth) ? $employee->date_of_birth : $employee->date_of_birth->toISOString()) : null,
                     'position' => $employee->position,
+                    'status' => $employee->status,
                     'provider' => $employee->provider,
+                    'profilePictureUrl' => $employee->photo,
+                    'updatedAt' => now()->toISOString(),
                 ];
 
                 try {
-                    $service->updateUser($employee->firestore_id, $data);
+                    // Gunakan UID sebagai document ID di Firestore
+                    $service->updateUser($employee->uid, $data);
                     \Filament\Notifications\Notification::make()
                         ->title('Employee Updated')
                         ->body('Employee ' . $employee->name . ' has been updated in Firestore.')
@@ -152,12 +160,13 @@ class Employee extends Model
 
         // Delete — only when force delete
         static::deleted(function ($employee) {
-            Log::info("Deleted event called. Firestore ID: " . $employee->firestore_id);
+            Log::info("Deleted event called. UID: " . $employee->uid);
 
-            if ($employee->firestore_id) {
+            if ($employee->uid) {
                 $service = new \App\Services\FirestoreService();
                 try {
-                    $service->deleteUser($employee->firestore_id);
+                    // Gunakan UID sebagai document ID di Firestore
+                    $service->deleteUser($employee->uid);
                     // Hapus dari Firebase Auth
                     $auth = app('firebase.auth');
                     $auth->deleteUser($employee->uid);
@@ -178,13 +187,46 @@ class Employee extends Model
         });
     }
 
-    public function salaries()
-    {
-        return $this->hasMany(EmployeeSalary::class, 'employee_id');
-    }
 
     public function presences()
     {
         return $this->hasMany(Presence::class, 'employee_id');
+    }
+
+    /**
+     * Get the photo URL with proper handling for Firebase/Google URLs
+     */
+    public function getPhotoUrlAttribute()
+    {
+        if (!$this->photo) {
+            return null;
+        }
+
+        // If it's already a full URL (Firebase/Google), use proxy for better compatibility
+        if (filter_var($this->photo, FILTER_VALIDATE_URL)) {
+            // Use proxy to avoid CORS issues
+            return route('image.proxy', ['url' => $this->photo]);
+        }
+
+        // If it's a local path, return with storage URL
+        return asset('storage/' . $this->photo);
+    }
+
+    /**
+     * Get the original photo URL without proxy
+     */
+    public function getOriginalPhotoUrlAttribute()
+    {
+        if (!$this->photo) {
+            return null;
+        }
+
+        // If it's already a full URL (Firebase/Google), return as is
+        if (filter_var($this->photo, FILTER_VALIDATE_URL)) {
+            return $this->photo;
+        }
+
+        // If it's a local path, return with storage URL
+        return asset('storage/' . $this->photo);
     }
 }

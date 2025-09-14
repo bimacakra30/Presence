@@ -19,7 +19,7 @@ class GeoLocatorResource extends Resource
 
     protected static ?string $navigationIcon = 'heroicon-o-map-pin';
 
-    protected static ?string $navigationGroup = 'Pengaturan';
+    protected static ?string $navigationGroup = 'Lokasi';
 
 
     public static function form(Form $form): Form

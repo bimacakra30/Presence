@@ -142,6 +142,8 @@ class FirestoreSyncService
                 // Ignore invalid dates
                 $data['date_of_birth'] = null;
             }
+        } else {
+            $data['date_of_birth'] = null;
         }
 
         // Don't sync password - keep existing or set default
@@ -172,7 +174,14 @@ class FirestoreSyncService
         }
 
         // Check date_of_birth separately
-        $currentDate = $employee->date_of_birth?->format('Y-m-d');
+        $currentDate = null;
+        if ($employee->date_of_birth) {
+            if (is_string($employee->date_of_birth)) {
+                $currentDate = $employee->date_of_birth;
+            } else {
+                $currentDate = $employee->date_of_birth->format('Y-m-d');
+            }
+        }
         $newDate = $newData['date_of_birth'] ?? null;
         
         if ($currentDate !== $newDate) {

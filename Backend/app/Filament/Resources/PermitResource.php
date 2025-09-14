@@ -20,10 +20,10 @@ use Illuminate\Support\Facades\Log;
 class PermitResource extends Resource
 {
     protected static ?string $model = Permit::class;
-    protected static ?string $navigationGroup = 'Presensi & Perizinan';
+    protected static ?string $navigationGroup = 'Manajemen Karyawan & Perizinan';
     protected static ?string $navigationLabel = 'Perizinan';
     protected static ?string $navigationBadgeTooltip = 'Jumlah Perizinan Karyawan';
-    protected static ?int $navigationSort = 1;
+    protected static ?int $navigationSort = 3;
 
     protected static ?string $navigationIcon = 'heroicon-o-envelope';
 
