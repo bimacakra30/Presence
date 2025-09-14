@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:Presence/utils/custom_snackbar_utils.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -12,7 +13,6 @@ import '../utils/cloudinary_service.dart';
 import '../components/home_widgets.dart';
 import '../utils/presensi_utils.dart';
 import '../utils/holidays.dart';
-import '../utils/customSnackBar_utils.dart';
 import '../components/maps_location_widget.dart';
 import 'settings_page.dart';
 import 'permit_page.dart';
@@ -127,7 +127,6 @@ class _HomePageState extends State<HomePage> {
     } catch (e) {
       debugPrint('Error fetching monthly attendance: $e');
       if (mounted) {
-        // Periksa mounted sebelum showSnackBar
         showCustomSnackBar(
           context,
           'Gagal memuat rekap presensi: $e',
@@ -136,7 +135,6 @@ class _HomePageState extends State<HomePage> {
       }
     } finally {
       if (mounted) {
-        // Periksa mounted sebelum setState
         setState(() {
           isLoadingSummary = false;
         });
@@ -156,12 +154,6 @@ class _HomePageState extends State<HomePage> {
       final startOfMonth = DateTime(now.year, now.month, 1);
       final endOfMonth = DateTime(now.year, now.month + 1, 0, 23, 59, 59);
 
-      debugPrint(
-        'Fetching permits for month: ${DateFormat('yyyy-MM').format(now)}',
-      );
-      debugPrint('Start date query: ${startOfMonth.toIso8601String()}');
-      debugPrint('End date query: ${endOfMonth.toIso8601String()}');
-
       final querySnapshot = await FirebaseFirestore.instance
           .collection('permits')
           .where('uid', isEqualTo: user.uid)
@@ -175,60 +167,35 @@ class _HomePageState extends State<HomePage> {
           )
           .get();
 
-      int approvedPermitsWorkDaysCount =
-          0; // Menggunakan nama variabel yang lebih jelas
-
-      debugPrint(
-        'Found ${querySnapshot.docs.length} permit documents for current user and month.',
-      );
+      int approvedPermitsWorkDaysCount = 0;
 
       for (var doc in querySnapshot.docs) {
         final data = doc.data();
         final status = (data['status'] as String?)?.toLowerCase();
 
-        debugPrint('Processing permit ID: ${doc.id}, Status: "$status"');
-
         if (status == 'approved') {
           final startDateString = data['startDate'] as String?;
           final endDateString = data['endDate'] as String?;
-
-          debugPrint(
-            'Approved permit: startDate: "$startDateString", endDate: "$endDateString"',
-          );
-
           if (startDateString != null && endDateString != null) {
             try {
               final startDate = DateTime.parse(startDateString);
               final endDate = DateTime.parse(endDateString);
-
               int currentPermitWorkDays = 0;
               DateTime currentDate = startDate;
-
-              // Iterate through each day in the permit range
               while (currentDate.isBefore(
                 endDate.add(const Duration(days: 1)),
               )) {
-                // Check if it's not a Sunday and not a national holiday
                 if (currentDate.weekday != DateTime.sunday &&
                     !parsedHolidays.any(
                       (holiday) => isSameDay(holiday, currentDate),
                     )) {
                   currentPermitWorkDays++;
-                } else {
-                  debugPrint(
-                    'Excluded date (Sunday or Holiday): ${DateFormat('yyyy-MM-dd').format(currentDate)}',
-                  );
                 }
                 currentDate = currentDate.add(const Duration(days: 1));
               }
               approvedPermitsWorkDaysCount += currentPermitWorkDays;
-              debugPrint(
-                'Calculated work days for this permit: $currentPermitWorkDays days. Total approved work days: $approvedPermitsWorkDaysCount',
-              );
             } catch (e) {
-              debugPrint(
-                'Error parsing date for permit duration in _fetchMonthlyPermitsSummary: $e',
-              );
+              debugPrint('Error parsing date for permit duration: $e');
             }
           }
         }
@@ -237,9 +204,6 @@ class _HomePageState extends State<HomePage> {
       if (mounted) {
         setState(() {
           monthlySummary['izin'] = approvedPermitsWorkDaysCount;
-          debugPrint(
-            'Final monthlySummary[\'izin\'] set to: ${monthlySummary['izin']}',
-          );
         });
       }
     } catch (e) {
@@ -279,10 +243,11 @@ class _HomePageState extends State<HomePage> {
       if (isSunday) reasons.add('Hari Minggu');
       if (isNationalHoliday) {
         final holidayDescription = getHolidayDescription(now);
-        if (holidayDescription != null)
+        if (holidayDescription != null) {
           reasons.add(holidayDescription);
-        else
+        } else {
           reasons.add('hari libur');
+        }
       }
       message += reasons.join(' dan ');
       showCustomSnackBar(context, message, isError: true);
@@ -308,7 +273,7 @@ class _HomePageState extends State<HomePage> {
         showCustomSnackBar(context, 'Pengambilan foto dibatalkan');
         return;
       }
-      showCustomSnackBar(context, 'Mengupload foto.....');
+      showCustomSnackBar(context, 'Proses Presensi...');
       Map<String, dynamic>? uploadResult;
       if (kIsWeb) {
         final bytes = await photo.readAsBytes();
@@ -385,6 +350,7 @@ class _HomePageState extends State<HomePage> {
       final presenceRef = FirebaseFirestore.instance.collection('presence');
 
       if (existingQuery.docs.isEmpty) {
+        // Clock In
         final workStartTime = DateTime(
           now.year,
           now.month,
@@ -392,6 +358,7 @@ class _HomePageState extends State<HomePage> {
           workStartHour,
         );
         final isLate = now.isAfter(workStartTime);
+
         String? lateDuration;
         if (isLate) {
           final duration = now.difference(workStartTime);
@@ -417,10 +384,10 @@ class _HomePageState extends State<HomePage> {
         });
         showCustomSnackBar(context, 'Berhasil Clock In');
       } else {
+        // Clock Out
         final doc = existingQuery.docs.first;
         final data = doc.data() as Map<String, dynamic>;
         final hasClockedOut = data['clockOut'] != null;
-        final canClockOut = now.hour >= workEndHour;
 
         if (hasClockedOut) {
           showCustomSnackBar(
@@ -431,13 +398,17 @@ class _HomePageState extends State<HomePage> {
           return;
         }
 
-        if (!canClockOut) {
-          showCustomSnackBar(
-            context,
-            'Clock Out hanya tersedia setelah jam 17:00',
-            isError: true,
-          );
-          return;
+        String? earlyReason;
+        if (now.hour < workEndHour) {
+          earlyReason = await _showReasonDialog();
+          if (earlyReason == null || earlyReason.isEmpty) {
+            showCustomSnackBar(
+              context,
+              'Alasan wajib diisi untuk Clock Out sebelum jam 17.00',
+              isError: true,
+            );
+            return;
+          }
         }
 
         await presenceRef.doc(doc.id).update({
@@ -445,6 +416,7 @@ class _HomePageState extends State<HomePage> {
           'fotoClockOut': imageUrl,
           'fotoClockOutPublicId': publicId,
           'locationName': locationName,
+          if (earlyReason != null) 'earlyClockOutReason': earlyReason,
         });
         showCustomSnackBar(context, 'Berhasil Clock Out');
       }
@@ -458,19 +430,39 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  void ShowCustomSnackBar(
-    BuildContext context,
-    String massage, {
-    bool isError = false,
-  }) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(massage),
-        backgroundColor: isError
-            ? const Color.fromRGBO(68, 88, 99, 1)
-            : Colors.green,
-        behavior: SnackBarBehavior.floating,
-      ),
+  Future<String?> _showReasonDialog() async {
+    final TextEditingController reasonController = TextEditingController();
+    return showDialog<String>(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text(
+            'Alasan Clock Out',
+            style: TextStyle(fontWeight: FontWeight.bold),
+          ),
+          content: TextField(
+            controller: reasonController,
+            maxLines: 3,
+            decoration: const InputDecoration(
+              hintText: 'Masukkan alasan Anda...',
+              border: OutlineInputBorder(),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(null),
+              child: const Text('Batal'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.of(context).pop(reasonController.text.trim());
+              },
+              child: const Text('Simpan'),
+            ),
+          ],
+        );
+      },
     );
   }
 
@@ -486,7 +478,6 @@ class _HomePageState extends State<HomePage> {
 
   @override
   Widget build(BuildContext context) {
-    // Mengatur warna ikon status bar agar terlihat jelas
     SystemChrome.setSystemUIOverlayStyle(
       const SystemUiOverlayStyle(statusBarIconBrightness: Brightness.light),
     );
@@ -704,9 +695,8 @@ class _HomePageState extends State<HomePage> {
                       color: const Color(0xFF4CAF50),
                     ),
                     StatusInfo(
-                      label: "Izin", // PERBAIKAN: Mengubah label
-                      count:
-                          "${monthlySummary['izin']} Hari", // PERBAIKAN: Mengambil dari key 'izin'
+                      label: "Izin",
+                      count: "${monthlySummary['izin']} Hari",
                       color: const Color(0xFFFF9800),
                     ),
                     StatusInfo(

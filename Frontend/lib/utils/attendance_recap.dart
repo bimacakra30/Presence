@@ -10,6 +10,8 @@ class AttendanceData {
   final bool isLate;
   final String lateDuration;
   final String name;
+  final bool isEarlyClockOut;
+  final String earlyClockOutReason;
 
   const AttendanceData({
     required this.date,
@@ -18,6 +20,8 @@ class AttendanceData {
     required this.isLate,
     required this.lateDuration,
     required this.name,
+    required this.isEarlyClockOut,
+    required this.earlyClockOutReason,
   });
 
   factory AttendanceData.fromMap(Map<String, dynamic> m) => AttendanceData(
@@ -27,6 +31,8 @@ class AttendanceData {
     isLate: (m['late'] ?? false) as bool,
     lateDuration: (m['lateDuration'] ?? '') as String,
     name: (m['name'] ?? '') as String,
+    isEarlyClockOut: (m['earlyClockOut'] ?? false) as bool,
+    earlyClockOutReason: (m['earlyClockOutReason'] ?? '') as String,
   );
 }
 
@@ -180,11 +186,41 @@ class _AttendanceRecapPageState extends State<AttendanceRecapPage> {
                     separatorBuilder: (_, _) => const Divider(height: 1),
                     itemBuilder: (_, i) {
                       final a = s.attendances[i];
-                      final status = a.isLate ? 'Terlambat ${a.lateDuration}' : 'Tepat waktu';
+                      String status = 'Tepat waktu';
+                      if (a.isLate) {
+                        status = 'Terlambat ${a.lateDuration}';
+                      }
+                      if (a.isEarlyClockOut) {
+                        status = status == 'Tepat waktu' ? 'Early Clock Out' : '$status, Early Clock Out';
+                      }
+                      
                       return ListTile(
                         title: Text(_dispDate(a.date)),
-                        subtitle: Text('Masuk: ${a.clockIn} • Keluar: ${a.clockOut}'),
-                        trailing: Text(status),
+                        subtitle: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('Masuk: ${a.clockIn} • Keluar: ${a.clockOut}'),
+                            if (a.isEarlyClockOut && a.earlyClockOutReason.isNotEmpty)
+                              Padding(
+                                padding: const EdgeInsets.only(top: 4),
+                                child: Text(
+                                  'Alasan: ${a.earlyClockOutReason}',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.orange[600],
+                                    fontStyle: FontStyle.italic,
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
+                        trailing: Text(
+                          status,
+                          style: TextStyle(
+                            color: a.isEarlyClockOut ? Colors.orange : null,
+                            fontWeight: a.isEarlyClockOut ? FontWeight.w500 : null,
+                          ),
+                        ),
                       );
                     },
                   ),

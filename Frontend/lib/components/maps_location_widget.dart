@@ -1,10 +1,10 @@
 import 'dart:math';
+import 'package:Presence/utils/custom_snackbar_utils.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import '../utils/customSnackBar_utils.dart'; // Pastikan path ini benar
 
 // Data model for Office Location
 class OfficeLocationConfig {
@@ -94,8 +94,6 @@ class MapLocationWidgetState extends State<MapLocationWidget> {
           'Geo-locator configs loaded: ${_availableOffices.length} offices.',
         );
         return;
-      } else {
-        debugPrint('No geo_locator documents found in Firestore.');
       }
     } catch (e) {
       debugPrint('Error loading geo_locator configs from Firestore: $e');
@@ -136,7 +134,7 @@ class MapLocationWidgetState extends State<MapLocationWidget> {
       if (mounted) {
         showCustomSnackBar(
           context,
-          'Tidak ada data lokasi kantor yang tersedia di Firestore.',
+          'Tidak ada data lokasi kantor yang tersedia.',
           isError: true,
         );
       }
@@ -336,7 +334,7 @@ class MapLocationWidgetState extends State<MapLocationWidget> {
                           ),
                           const SizedBox(height: 10),
                           const Text(
-                            'Tidak ada data lokasi kantor yang tersedia di Firestore.',
+                            'Tidak ada data lokasi kantor yang tersedia.',
                             textAlign: TextAlign.center,
                             style: TextStyle(
                               color: Color.fromRGBO(97, 97, 97, 1),

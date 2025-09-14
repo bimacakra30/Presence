@@ -1,4 +1,5 @@
-import 'dart:io';
+import 'dart:io' show File;
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
@@ -365,16 +366,25 @@ class _EditProfilePageState extends State<EditProfilePage>
   Future<void> _changeProfilePicture(ImageSource source) async {
     final pickedFile = await _picker.pickImage(source: source);
     if (pickedFile != null) {
-      final imageFile = File(pickedFile.path);
 
       if (!mounted) return;
       setState(() {
         _isLoading = true;
       });
 
-      final uploadResult = await CloudinaryService.uploadImageToCloudinary(
-        imageFile,
-      );
+      Map<String, dynamic>? uploadResult;
+      if (kIsWeb) {
+        final bytes = await pickedFile.readAsBytes();
+        uploadResult = await CloudinaryService.uploadImageBytesToCloudinary(
+          bytes,
+          pickedFile.name,
+        );
+      } else {
+        final imageFile = File(pickedFile.path);
+        uploadResult = await CloudinaryService.uploadImageToCloudinary(
+          imageFile,
+        );
+      }
 
       if (!mounted) return;
       if (uploadResult != null && uploadResult['url'] != null) {
@@ -601,7 +611,7 @@ class _EditProfilePageState extends State<EditProfilePage>
                                     ),
                                     boxShadow: [
                                       BoxShadow(
-                                        color: Colors.black.withOpacity(0.2),
+                                        color: Colors.black.withValues(alpha: 0.2),
                                         blurRadius: 20,
                                         offset: const Offset(0, 10),
                                       ),
@@ -643,7 +653,7 @@ class _EditProfilePageState extends State<EditProfilePage>
                                       ),
                                       boxShadow: [
                                         BoxShadow(
-                                          color: Colors.black.withOpacity(0.2),
+                                          color: Colors.black.withValues(alpha: 0.2),
                                           blurRadius: 10,
                                           offset: const Offset(0, 5),
                                         ),
@@ -677,7 +687,7 @@ class _EditProfilePageState extends State<EditProfilePage>
                                 : 'Posisi',
                             style: GoogleFonts.poppins(
                               fontSize: 16,
-                              color: Colors.white.withOpacity(0.9),
+                              color: Colors.white.withValues(alpha: 0.9),
                             ),
                           ),
                           const SizedBox(height: 30),
@@ -808,12 +818,7 @@ class _EditProfilePageState extends State<EditProfilePage>
                               label: 'Posisi',
                               icon: Icons.work_rounded,
                               enabled: false,
-                              validator: (value) {
-                                if (value == null || value.isEmpty) {
-                                  return 'Posisi tidak boleh kosong';
-                                }
-                                return null;
-                              },
+                              validator: (value) => null,
                             ),
                             const SizedBox(height: 20),
                             
@@ -916,10 +921,10 @@ class _EditProfilePageState extends State<EditProfilePage>
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: color.withOpacity(0.2)),
+        border: Border.all(color: color.withValues(alpha: 0.2)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 10,
             offset: const Offset(0, 5),
           ),
@@ -930,7 +935,7 @@ class _EditProfilePageState extends State<EditProfilePage>
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: color.withOpacity(0.1),
+              color: color.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Icon(
@@ -986,7 +991,7 @@ class _EditProfilePageState extends State<EditProfilePage>
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 10,
             offset: const Offset(0, 5),
           ),

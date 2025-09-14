@@ -353,10 +353,55 @@ class _AttendanceHistoryPageState extends State<AttendanceHistoryPage> {
                   if (data['clockOut'] != null)
                     buildTimeInfo(
                       icon: Icons.logout,
-                      label: 'Waktu Pulang',
+                      label: data['earlyClockOut'] == true ? 'Waktu Pulang (Early)' : 'Waktu Pulang',
                       time: DateFormat.Hm().format(DateTime.parse(data['clockOut'])),
-                      color: const Color(0xFF26C6DA),
+                      color: data['earlyClockOut'] == true ? Colors.orange : const Color(0xFF26C6DA),
                     ),
+                  if (data['earlyClockOut'] == true && data['earlyClockOutReason'] != null) ...[
+                    const SizedBox(height: 12),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.orange.withAlpha(25),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.orange.withAlpha(76), width: 1),
+                      ),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Icon(
+                            Icons.info_outline,
+                            color: Colors.orange[700],
+                            size: 16,
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Alasan Early Clock Out:',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.orange[700],
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  data['earlyClockOutReason'],
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.orange[600],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),

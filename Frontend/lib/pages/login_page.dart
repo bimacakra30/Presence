@@ -1,11 +1,10 @@
+import 'dart:async';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
-import 'loading_page.dart';
-import 'home.dart';
 import 'package:Presence/components/dialog/forgot_password_dialog.dart';
 import 'package:Presence/utils/fcm_token_manager.dart';
 
@@ -64,22 +63,21 @@ class _LoginPageState extends State<LoginPage> {
     });
 
     if (usernameError != null || passwordError != null) {
-      setState(() => isLoading = false);
+      if (mounted) setState(() => isLoading = false);
       return;
     }
 
-    if (!mounted) return;
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (_) => const LoadingPage()),
-    );
+    // Push LoadingPage
+    if (mounted) {
+      Navigator.pushNamed(context, '/loading');
+    }
 
     try {
       if (!(await checkConnectivity())) {
         if (!mounted) return;
         if (Navigator.canPop(context)) Navigator.pop(context);
         setState(() {
-          passwordError = "Tidak ada koneksi internet.";
+          passwordError = 'Tidak ada koneksi internet.';
           isLoading = false;
         });
         return;
@@ -97,7 +95,7 @@ class _LoginPageState extends State<LoginPage> {
         if (!mounted) return;
         if (Navigator.canPop(context)) Navigator.pop(context);
         setState(() {
-          usernameError = "Username tidak ditemukan";
+          usernameError = 'Username tidak ditemukan';
           isLoading = false;
         });
         return;
@@ -116,7 +114,7 @@ class _LoginPageState extends State<LoginPage> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text(
-              "Akun Anda berstatus non-aktif. Silakan hubungi administrator.",
+              'Akun Anda berstatus non-aktif. Silakan hubungi administrator.',
             ),
             backgroundColor: Colors.red,
           ),
@@ -135,7 +133,7 @@ class _LoginPageState extends State<LoginPage> {
         if (!mounted) return;
         if (Navigator.canPop(context)) Navigator.pop(context);
         setState(() {
-          usernameError = "Gagal login: Pengguna tidak ditemukan";
+          usernameError = 'Gagal login: Pengguna tidak ditemukan';
           isLoading = false;
         });
         return;
@@ -191,7 +189,7 @@ class _LoginPageState extends State<LoginPage> {
         if (Navigator.canPop(context)) Navigator.pop(context);
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text("Error: Data profil tidak ditemukan"),
+            content: Text('Error: Data profil tidak ditemukan'),
             backgroundColor: Colors.red,
           ),
         );
@@ -201,39 +199,36 @@ class _LoginPageState extends State<LoginPage> {
       debugPrint('Data Firestore final: $dataToSave');
 
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('name', dataToSave['name'] ?? 'Unknown');
-      await prefs.setString('email', dataToSave['email'] ?? '');
-      await prefs.setString('username', dataToSave['username'] ?? '');
-      await prefs.setString('phone', dataToSave['phone'] ?? '');
-      await prefs.setString(
-        'profilePictureUrl',
-        dataToSave['profilePictureUrl'] ?? '',
-      );
-      await prefs.setString('position', dataToSave['position'] ?? '');
-      await prefs.setString('status', dataToSave['status'] ?? 'aktif');
-      await prefs.setString('address', dataToSave['address'] ?? '');
-      await prefs.setString('dateOfBirth', dataToSave['dateOfBirth'] ?? '');
-      await prefs.setString(
-        'provider',
-        dataToSave['provider'] ?? 'email/password',
-      );
-      await prefs.setString('uid', dataToSave['uid'] ?? firebaseUser.uid);
-      await prefs.setString(
-        'createdAt',
-        dataToSave['createdAt'] ?? DateTime.now().toIso8601String(),
-      );
+      final futures = <Future>[
+        prefs.setString('name', dataToSave['name'] ?? 'Unknown'),
+        prefs.setString('email', dataToSave['email'] ?? ''),
+        prefs.setString('username', dataToSave['username'] ?? ''),
+        prefs.setString('phone', dataToSave['phone'] ?? ''),
+        prefs.setString(
+          'profilePictureUrl',
+          dataToSave['profilePictureUrl'] ?? '',
+        ),
+        prefs.setString('position', dataToSave['position'] ?? ''),
+        prefs.setString('status', dataToSave['status'] ?? 'aktif'),
+        prefs.setString('address', dataToSave['address'] ?? ''),
+        prefs.setString('dateOfBirth', dataToSave['dateOfBirth'] ?? ''),
+        prefs.setString('provider', dataToSave['provider'] ?? 'email/password'),
+        prefs.setString('uid', dataToSave['uid'] ?? firebaseUser.uid),
+        prefs.setString(
+          'createdAt',
+          dataToSave['createdAt'] ?? DateTime.now().toIso8601String(),
+        ),
+      ];
 
+      await Future.wait(futures);
       await saveEmployeeFcmTokenToFirestore();
 
       debugPrint('Data disimpan ke SharedPreferences. Menuju HomePage.');
-      await Future.delayed(const Duration(seconds: 1));
-
-      if (!mounted) return;
-      Navigator.pushAndRemoveUntil(
-        context,
-        MaterialPageRoute(builder: (_) => const HomePage()),
-        (route) => false,
-      );
+      if (mounted) {
+        Navigator.pop(context); // Pop LoadingPage
+        Navigator.pushReplacementNamed(context, '/home');
+        setState(() => isLoading = false);
+      }
     } on FirebaseAuthException catch (e) {
       debugPrint('Firebase Auth error: ${e.code} - ${e.message}');
       if (!mounted) return;
@@ -260,28 +255,36 @@ class _LoginPageState extends State<LoginPage> {
       if (!mounted) return;
       if (Navigator.canPop(context)) Navigator.pop(context);
       setState(() {
-        passwordError = "Terjadi kesalahan: ${e.toString()}";
+        passwordError = 'Terjadi kesalahan: ${e.toString()}';
         isLoading = false;
       });
+      showCustomSnackBar(
+        context,
+        'Terjadi kesalahan: ${e.toString()}',
+        isError: true,
+      );
     }
   }
 
   Future<void> loginWithGoogle() async {
     if (!mounted) return;
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (_) => const LoadingPage()),
-    );
+
+    setState(() => isLoading = true);
+
+    // Push LoadingPage
+    if (mounted) {
+      Navigator.pushNamed(context, '/loading');
+    }
 
     try {
       if (!(await checkConnectivity())) {
         if (!mounted) return;
         if (Navigator.canPop(context)) Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text("Tidak ada koneksi internet."),
-            backgroundColor: Colors.red,
-          ),
+        setState(() => isLoading = false);
+        showCustomSnackBar(
+          context,
+          'Tidak ada koneksi internet.',
+          isError: true,
         );
         return;
       }
@@ -295,9 +298,29 @@ class _LoginPageState extends State<LoginPage> {
         debugPrint('Google Sign-In dibatalkan oleh pengguna');
         if (!mounted) return;
         if (Navigator.canPop(context)) Navigator.pop(context);
+        setState(() => isLoading = false);
         return;
       }
       debugPrint('Google user diperoleh: ${googleUser.email}');
+
+      final query = await FirebaseFirestore.instance
+          .collection('employees')
+          .where('email', isEqualTo: googleUser.email)
+          .limit(1)
+          .get();
+
+      if (query.docs.isEmpty) {
+        debugPrint('Email ${googleUser.email} tidak ditemukan di Firestore');
+        if (!mounted) return;
+        if (Navigator.canPop(context)) Navigator.pop(context);
+        setState(() => isLoading = false);
+        showCustomSnackBar(
+          context,
+          'Akun dengan email ${googleUser.email} belum terdaftar. Silakan hubungi admin.',
+          isError: true,
+        );
+        return;
+      }
 
       final googleAuth = await googleUser.authentication;
       final credential = GoogleAuthProvider.credential(
@@ -315,204 +338,109 @@ class _LoginPageState extends State<LoginPage> {
         debugPrint('Firebase user null setelah signInWithCredential');
         if (!mounted) return;
         if (Navigator.canPop(context)) Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text("Gagal login Google: Pengguna tidak ditemukan"),
-            backgroundColor: Colors.red,
-          ),
+        setState(() => isLoading = false);
+        showCustomSnackBar(
+          context,
+          'Gagal login Google: Pengguna tidak ditemukan',
+          isError: true,
         );
         return;
       }
+
       debugPrint('Firebase user UID: ${firebaseUser.uid}');
 
-      // Periksa apakah akun memiliki kredensial email/password
-      final authProviders = await firebaseUser.providerData;
-      bool hasPasswordProvider = authProviders.any(
-        (provider) => provider.providerId == 'password',
-      );
+      final userDoc = query.docs.first;
+      final dataToSave = userDoc.data();
 
-      if (!hasPasswordProvider &&
-          userCredential.additionalUserInfo?.isNewUser != true) {
-        // Panggil dialog untuk setel password
-        await _showSetPasswordDialog(
-          firebaseUser.email ?? '',
-        ); // Sekarang aman dengan Future<void>
+      final userStatus = dataToSave['status'] as String? ?? 'aktif';
+      if (userStatus.toLowerCase() == 'non active') {
+        if (!mounted) return;
+        if (Navigator.canPop(context)) Navigator.pop(context);
+        setState(() => isLoading = false);
+        await FirebaseAuth.instance.signOut();
+        showCustomSnackBar(
+          context,
+          'Akun Anda berstatus non-aktif. Silakan hubungi administrator.',
+          isError: true,
+        );
+        return;
       }
 
-      // Sinkronkan dokumen Firestore
       final employeeDocRef = FirebaseFirestore.instance
           .collection('employees')
           .doc(firebaseUser.uid);
       final employeeDocSnapshot = await employeeDocRef.get();
 
       if (!employeeDocSnapshot.exists) {
-        debugPrint(
-          'Dokumen Firestore untuk UID ${firebaseUser.uid} tidak ditemukan. Membuat baru.',
-        );
-        final queryByEmail = await FirebaseFirestore.instance
-            .collection('employees')
-            .where('email', isEqualTo: firebaseUser.email)
-            .limit(1)
-            .get();
-
-        if (queryByEmail.docs.isNotEmpty) {
-          final oldDoc = queryByEmail.docs.first;
-          final oldData = oldDoc.data();
-          await employeeDocRef.set(oldData);
-          debugPrint('Migrasi dokumen lama ke UID: ${firebaseUser.uid}');
-          if (oldDoc.id != firebaseUser.uid) {
-            debugPrint('Menghapus dokumen lama dengan ID: ${oldDoc.id}');
-            await oldDoc.reference.delete();
-          }
-        } else {
-          await employeeDocRef.set({
-            'uid': firebaseUser.uid,
-            'name': firebaseUser.displayName ?? 'Unknown',
-            'email': firebaseUser.email ?? '',
-            'username': firebaseUser.email?.split('@')[0] ?? '',
-            'profilePictureUrl': firebaseUser.photoURL ?? '',
-            'position': '',
-            'status': 'aktif',
-            'address': '',
-            'dateOfBirth': '',
-            'provider': 'google',
-            'createdAt': DateTime.now().toIso8601String(),
-            'phone': null,
-          });
-          debugPrint(
-            'Membuat dokumen Firestore baru untuk UID: ${firebaseUser.uid}',
-          );
+        debugPrint('Membuat dokumen baru untuk UID: ${firebaseUser.uid}');
+        await employeeDocRef.set({
+          ...dataToSave,
+          'uid': firebaseUser.uid,
+          'email': firebaseUser.email ?? dataToSave['email'],
+          'provider': 'google',
+        });
+        if (userDoc.id != firebaseUser.uid) {
+          debugPrint('Menghapus dokumen lama dengan ID: ${userDoc.id}');
+          await userDoc.reference.delete();
         }
       } else {
-        debugPrint(
-          'Dokumen Firestore untuk UID ${firebaseUser.uid} ditemukan. Memperbarui data.',
-        );
-        final existingData = employeeDocSnapshot.data() as Map<String, dynamic>;
-        final updates = <String, dynamic>{};
-        if (existingData['uid'] != firebaseUser.uid) {
-          updates['uid'] = firebaseUser.uid;
-        }
-        if (existingData['email'] != firebaseUser.email) {
-          updates['email'] = firebaseUser.email;
-        }
-        if (firebaseUser.photoURL != null &&
-            existingData['profilePictureUrl'] != firebaseUser.photoURL) {
-          updates['profilePictureUrl'] = firebaseUser.photoURL;
-        }
-        if (existingData['provider'] != 'google') {
-          updates['provider'] = 'google';
-        }
-        if (existingData['name'] != firebaseUser.displayName) {
-          updates['name'] = firebaseUser.displayName;
-        }
-        if (!existingData.containsKey('phone') || existingData['phone'] == null) {
-          updates['phone'] = null; // Bisa diisi dengan data dari Google profile jika ada, tapi biasanya tidak ada no. HP
-        }
-        if (updates.isNotEmpty) {
-          await employeeDocRef.update(updates);
-          debugPrint('Memperbarui dokumen Firestore dengan: $updates');
-        }
-      }
-
-      final finalUserDoc = await employeeDocRef.get();
-      final dataToSave = finalUserDoc.data();
-
-      if (dataToSave == null) {
-        debugPrint('Data Firestore kosong setelah login Google');
-        if (!mounted) return;
-        if (Navigator.canPop(context)) Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text("Error: Data profil tidak ditemukan"),
-            backgroundColor: Colors.red,
-          ),
-        );
-        return;
-      }
-      debugPrint('Data Firestore final untuk Google user: $dataToSave');
-
-      final userStatus = dataToSave['status'] as String? ?? 'active';
-      if (userStatus.toLowerCase() == 'non active') {
-        debugPrint(
-          'Pengguna Google ${firebaseUser.email} berstatus non-aktif. Login diblokir.',
-        );
-        if (!mounted) return;
-        if (Navigator.canPop(context)) Navigator.pop(context);
-        // Also sign out from Firebase Auth to prevent half-logged-in state
-        await FirebaseAuth.instance.signOut();
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-              "Akun Anda berstatus non-aktif. Silakan hubungi administrator.",
-            ),
-            backgroundColor: Colors.red,
-          ),
-        );
-        return;
+        debugPrint('Memperbarui dokumen untuk UID: ${firebaseUser.uid}');
+        await employeeDocRef.update({
+          'provider': 'google',
+          'email': firebaseUser.email ?? dataToSave['email'],
+        });
       }
 
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('name', dataToSave['name'] ?? 'Unknown');
-      await prefs.setString('email', dataToSave['email'] ?? '');
-      await prefs.setString('username', dataToSave['username'] ?? '');
-      await prefs.setString('phone', dataToSave['phone'] ?? '');
-      await prefs.setString(
-        'profilePictureUrl',
-        dataToSave['profilePictureUrl'] ?? '',
-      );
-      await prefs.setString('position', dataToSave['position'] ?? '');
-      await prefs.setString('status', dataToSave['status'] ?? 'aktif');
-      await prefs.setString('address', dataToSave['address'] ?? '');
-      await prefs.setString('dateOfBirth', dataToSave['dateOfBirth'] ?? '');
-      await prefs.setString('provider', dataToSave['provider'] ?? 'google');
-      await prefs.setString('uid', dataToSave['uid'] ?? firebaseUser.uid);
-      await prefs.setString(
-        'createdAt',
-        dataToSave['createdAt'] ?? DateTime.now().toIso8601String(),
-      );
+      final futures = <Future>[
+        prefs.setString('name', dataToSave['name'] ?? 'Unknown'),
+        prefs.setString('email', dataToSave['email'] ?? ''),
+        prefs.setString('username', dataToSave['username'] ?? ''),
+        prefs.setString('phone', dataToSave['phone'] ?? ''),
+        prefs.setString(
+          'profilePictureUrl',
+          dataToSave['profilePictureUrl'] ?? '',
+        ),
+        prefs.setString('position', dataToSave['position'] ?? ''),
+        prefs.setString('status', dataToSave['status'] ?? 'aktif'),
+        prefs.setString('address', dataToSave['address'] ?? ''),
+        prefs.setString('dateOfBirth', dataToSave['dateOfBirth'] ?? ''),
+        prefs.setString('provider', 'google'),
+        prefs.setString('uid', firebaseUser.uid),
+        prefs.setString(
+          'createdAt',
+          dataToSave['createdAt'] ?? DateTime.now().toIso8601String(),
+        ),
+      ];
 
+      await Future.wait(futures);
       await saveEmployeeFcmTokenToFirestore();
 
-      debugPrint(
-        'Data disimpan ke SharedPreferences untuk Google user. Menuju HomePage.',
-      );
-      await Future.delayed(const Duration(seconds: 2));
-
-      if (!mounted) return;
-      Navigator.pushAndRemoveUntil(
-        context,
-        MaterialPageRoute(builder: (_) => const HomePage()),
-        (route) => false,
-      );
+      debugPrint('Data disimpan ke SharedPreferences. Menuju HomePage.');
+      if (mounted) {
+        Navigator.pop(context); // Pop LoadingPage
+        Navigator.pushReplacementNamed(context, '/home');
+        setState(() => isLoading = false);
+      }
     } on FirebaseAuthException catch (e) {
-      debugPrint(
-        'Firebase Auth error (Google Sign-In): ${e.code} - ${e.message}',
-      );
+      debugPrint('Firebase Auth error: ${e.code} - ${e.message}');
       if (!mounted) return;
       if (Navigator.canPop(context)) Navigator.pop(context);
-      String errorMessage;
-      if (e.code == 'account-exists-with-different-credential') {
-        errorMessage =
-            'Akun sudah ada dengan metode lain. Silakan login dengan metode yang sesuai atau hubungkan akun.';
-      } else if (e.code == 'invalid-credential') {
-        errorMessage = 'Kredensial Google tidak valid. Silakan coba lagi.';
-      } else if (e.code == 'network-request-failed') {
-        errorMessage = 'Koneksi jaringan bermasalah. Silakan coba lagi.';
-      } else {
-        errorMessage = 'Gagal login Google: ${e.message}';
-      }
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(errorMessage), backgroundColor: Colors.red),
+      setState(() => isLoading = false);
+      showCustomSnackBar(
+        context,
+        'Gagal login Google: ${e.message}',
+        isError: true,
       );
     } catch (e) {
-      debugPrint('Error umum saat login Google: $e');
+      debugPrint('Error umum saat Google Sign-In: $e');
       if (!mounted) return;
       if (Navigator.canPop(context)) Navigator.pop(context);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text("Terjadi kesalahan saat login Google: ${e.toString()}"),
-          backgroundColor: Colors.red,
-        ),
+      setState(() => isLoading = false);
+      showCustomSnackBar(
+        context,
+        'Terjadi kesalahan: ${e.toString()}',
+        isError: true,
       );
     }
   }
@@ -657,52 +585,30 @@ class _LoginPageState extends State<LoginPage> {
     );
   }
 
-  Future<void> _showSetPasswordDialog(String email) async {
-    final passwordController = TextEditingController();
-    await showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Setel Password Baru'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: passwordController,
-              decoration: const InputDecoration(labelText: 'Password Baru'),
-              obscureText: true,
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Batal'),
-          ),
-          TextButton(
-            onPressed: () async {
-              try {
-                await FirebaseAuth.instance.currentUser?.updatePassword(
-                  passwordController.text,
-                );
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Password berhasil disetel'),
-                    backgroundColor: Colors.green,
-                  ),
-                );
-                Navigator.pop(context);
-              } catch (e) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('Gagal menyimpan password: $e'),
-                    backgroundColor: Colors.red,
-                  ),
-                );
-              }
-            },
-            child: const Text('Simpan'),
-          ),
-        ],
+  void showSnackBar(
+    BuildContext context,
+    String message, {
+    bool isError = false,
+  }) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: isError ? Colors.red : Colors.green,
+        duration: const Duration(seconds: 3),
+      ),
+    );
+  }
+
+  void showCustomSnackBar(
+    BuildContext context,
+    String message, {
+    bool isError = false,
+  }) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: isError ? Colors.red : Colors.green,
+        duration: const Duration(seconds: 3),
       ),
     );
   }
@@ -728,7 +634,7 @@ class _LoginPageState extends State<LoginPage> {
                 borderRadius: BorderRadius.circular(24),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.1),
+                    color: Colors.black.withValues(alpha: 0.1),
                     blurRadius: 12,
                     offset: const Offset(0, 8),
                   ),
@@ -746,7 +652,7 @@ class _LoginPageState extends State<LoginPage> {
                     controller: emailController,
                     decoration: InputDecoration(
                       prefixIcon: const Icon(Icons.person_outline),
-                      hintText: "Username",
+                      hintText: 'Username',
                       errorText: usernameError,
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
@@ -769,7 +675,7 @@ class _LoginPageState extends State<LoginPage> {
                           });
                         },
                       ),
-                      hintText: "Password",
+                      hintText: 'Password',
                       errorText: passwordError,
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
@@ -782,7 +688,7 @@ class _LoginPageState extends State<LoginPage> {
                     child: TextButton(
                       onPressed: _showForgotPasswordDialog,
                       child: const Text(
-                        "Forgot Password?",
+                        'Forgot Password?',
                         style: TextStyle(
                           color: Colors.blue,
                           fontWeight: FontWeight.w500,
@@ -805,7 +711,7 @@ class _LoginPageState extends State<LoginPage> {
                       child: isLoading
                           ? const CircularProgressIndicator(color: Colors.white)
                           : const Text(
-                              "Sign In",
+                              'Sign In',
                               style: TextStyle(color: Colors.white),
                             ),
                     ),
@@ -816,7 +722,7 @@ class _LoginPageState extends State<LoginPage> {
                       Expanded(child: Divider()),
                       Padding(
                         padding: EdgeInsets.symmetric(horizontal: 8.0),
-                        child: Text("Or"),
+                        child: Text('Or'),
                       ),
                       Expanded(child: Divider()),
                     ],
@@ -832,7 +738,7 @@ class _LoginPageState extends State<LoginPage> {
                           borderRadius: BorderRadius.circular(12),
                         ),
                       ),
-                      child: const Text("Continue with Google"),
+                      child: const Text('Continue with Google'),
                     ),
                   ),
                   const SizedBox(height: 8),

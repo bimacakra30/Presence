@@ -4,7 +4,6 @@ import 'package:flutter/services.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'login_page.dart';
 import 'history.dart';
 import 'permit_history_page.dart';
 import 'package:Presence/components/profile_avatar.dart';
@@ -26,8 +25,6 @@ class _SettingsPageState extends State<SettingsPage>
   String _username = 'User';
   String _profilePictureUrl = '';
   String _email = '';
-  bool _pushNotifications = true;
-  bool _appNotifications = true;
 
   @override
   void initState() {
@@ -63,14 +60,7 @@ class _SettingsPageState extends State<SettingsPage>
       _profilePictureUrl = prefs.getString('profilePictureUrl') ?? '';
       _username = prefs.getString('name') ?? 'User';
       _email = prefs.getString('email') ?? '';
-      _pushNotifications = prefs.getBool('push_notifications') ?? true;
-      _appNotifications = prefs.getBool('app_notifications') ?? true;
     });
-  }
-
-  Future<void> _updateNotificationSetting(String key, bool value) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool(key, value);
   }
 
   @override
@@ -165,8 +155,6 @@ class _SettingsPageState extends State<SettingsPage>
           const SizedBox(height: 24),
           _buildAccountSection(),
           const SizedBox(height: 24),
-          _buildNotificationSection(),
-          const SizedBox(height: 24),
           _buildGeneralSection(),
           const SizedBox(height: 32),
           _buildLogoutButton(),
@@ -197,7 +185,7 @@ class _SettingsPageState extends State<SettingsPage>
           borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.05),
+              color: Colors.black.withValues(alpha: 0.05),
               blurRadius: 10,
               offset: const Offset(0, 2),
             ),
@@ -232,10 +220,7 @@ class _SettingsPageState extends State<SettingsPage>
                 ],
               ),
             ),
-            const Icon(
-              Icons.chevron_right,
-              color: Colors.grey,
-            ),
+            const Icon(Icons.chevron_right, color: Colors.grey),
           ],
         ),
       ),
@@ -284,46 +269,10 @@ class _SettingsPageState extends State<SettingsPage>
             // Ini tetap akan menavigasi ke EditProfilePage
             Navigator.push(
               context,
-              MaterialPageRoute(
-                builder: (context) => const EditProfilePage(),
-              ),
+              MaterialPageRoute(builder: (context) => const EditProfilePage()),
             ).then((value) {
               _loadUserData(); // Memanggil _loadUserData() setelah kembali dari EditProfilePage
             });
-          },
-        ),
-      ],
-    );
-  }
-  Widget _buildNotificationSection() {
-    return _buildSection(
-      title: 'Notifikasi',
-      icon: Icons.notifications_outlined,
-      children: [
-        _buildSwitchMenuItem(
-          icon: Icons.push_pin_outlined,
-          title: 'Push Notifications',
-          subtitle: 'Terima notifikasi push dari aplikasi',
-          value: _pushNotifications,
-          onChanged: (value) {
-            setState(() {
-              _pushNotifications = value;
-            });
-            _updateNotificationSetting('push_notifications', value);
-            HapticFeedback.lightImpact();
-          },
-        ),
-        _buildSwitchMenuItem(
-          icon: Icons.notifications_active_outlined,
-          title: 'App Notifications',
-          subtitle: 'Notifikasi dalam aplikasi',
-          value: _appNotifications,
-          onChanged: (value) {
-            setState(() {
-              _appNotifications = value;
-            });
-            _updateNotificationSetting('app_notifications', value);
-            HapticFeedback.lightImpact();
           },
         ),
       ],
@@ -336,44 +285,12 @@ class _SettingsPageState extends State<SettingsPage>
       icon: Icons.settings_outlined,
       children: [
         _buildMenuItem(
-          icon: Icons.language_outlined,
-          title: 'Bahasa',
-          subtitle: 'Indonesia',
-          onTap: () {
-            HapticFeedback.lightImpact();
-            _showLanguageDialog();
-          },
-          trailing: const Icon(
-            Icons.arrow_forward_ios,
-            size: 16,
-            color: Colors.grey,
-          ),
-        ),
-        _buildMenuItem(
-          icon: Icons.help_outline,
-          title: 'Bantuan & Dukungan',
-          subtitle: 'FAQ dan kontak support',
-          onTap: () {
-            HapticFeedback.lightImpact();
-            _showComingSoonDialog('Bantuan & Dukungan');
-          },
-        ),
-        _buildMenuItem(
           icon: Icons.info_outline,
           title: 'Tentang Aplikasi',
           subtitle: 'Versi 1.0.0',
           onTap: () {
             HapticFeedback.lightImpact();
             _showAboutDialog();
-          },
-        ),
-        _buildMenuItem(
-          icon: Icons.privacy_tip_outlined,
-          title: 'Kebijakan Privasi',
-          subtitle: 'Pelajari cara kami melindungi data',
-          onTap: () {
-            HapticFeedback.lightImpact();
-            _showComingSoonDialog('Kebijakan Privasi');
           },
         ),
       ],
@@ -391,7 +308,7 @@ class _SettingsPageState extends State<SettingsPage>
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 10,
             offset: const Offset(0, 2),
           ),
@@ -407,7 +324,7 @@ class _SettingsPageState extends State<SettingsPage>
                 Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF00A0E3).withOpacity(0.1),
+                    color: const Color(0xFF00A0E3).withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Icon(icon, color: const Color(0xFF00A0E3), size: 20),
@@ -492,56 +409,6 @@ class _SettingsPageState extends State<SettingsPage>
     );
   }
 
-  Widget _buildSwitchMenuItem({
-    required IconData icon,
-    required String title,
-    required String subtitle,
-    required bool value,
-    required ValueChanged<bool> onChanged,
-  }) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: Colors.grey.shade100,
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Icon(icon, color: Colors.grey.shade600, size: 20),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w500,
-                    color: Colors.black87,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  subtitle,
-                  style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
-                ),
-              ],
-            ),
-          ),
-          Switch(
-            value: value,
-            onChanged: onChanged,
-            activeColor: const Color(0xFF00A0E3),
-            materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-          ),
-        ],
-      ),
-    );
-  }
 
   Widget _buildLogoutButton() {
     return SizedBox(
@@ -607,98 +474,60 @@ class _SettingsPageState extends State<SettingsPage>
   }
 
   Future<void> _performLogout() async {
-  try {
-    // Tampilkan dialog loading
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => const Center(
-        child: Card(
-          child: Padding(
-            padding: EdgeInsets.all(20),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                CircularProgressIndicator(),
-                SizedBox(height: 16),
-                Text('Keluar dari akun...'),
-              ],
+    try {
+      // Tampilkan dialog loading
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => const Center(
+          child: Card(
+            child: Padding(
+              padding: EdgeInsets.all(20),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  CircularProgressIndicator(),
+                  SizedBox(height: 16),
+                  Text('Keluar dari akun...'),
+                ],
+              ),
             ),
           ),
         ),
-      ),
-    );
-
-    // Logout dari Google Sign-In
-    final googleSignIn = GoogleSignIn();
-    await googleSignIn.signOut();
-
-    // Logout dari Firebase Authentication
-    await FirebaseAuth.instance.signOut();
-
-    // Hapus data lokal dari SharedPreferences
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.clear();
-
-    // Tutup dialog loading
-    if (mounted) {
-      Navigator.pop(context); // Tutup dialog sebelum navigasi
-      Navigator.pushAndRemoveUntil(
-        context,
-        MaterialPageRoute(builder: (context) => const LoginPage()),
-        (route) => false,
       );
-    }
-    debugPrint('Logout berhasil. Semua sesi dan data lokal dihapus.');
-  } catch (e) {
-    // Tutup dialog loading jika ada error
-    if (mounted) {
-      Navigator.pop(context);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Gagal logout: ${e.toString()}'),
-          backgroundColor: Colors.red,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-    }
-    debugPrint('Error saat logout: $e');
-  }
-}
 
-  void _showLanguageDialog() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('Pilih Bahasa'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: const Text('🇮🇩'),
-              title: const Text('Bahasa Indonesia'),
-              trailing: const Icon(Icons.check, color: Colors.green),
-              onTap: () => Navigator.pop(context),
-            ),
-            ListTile(
-              leading: const Text('🇺🇸'),
-              title: const Text('English'),
-              subtitle: const Text('Coming Soon'),
-              enabled: false,
-              onTap: () {},
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Tutup'),
+      // Logout dari Google Sign-In
+      final googleSignIn = GoogleSignIn();
+      await googleSignIn.signOut();
+
+      // Logout dari Firebase Authentication
+      await FirebaseAuth.instance.signOut();
+
+      // Hapus data lokal dari SharedPreferences
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.clear();
+
+      // Tutup dialog loading
+      if (mounted) {
+        Navigator.pushReplacementNamed(context, '/login');
+      }
+      debugPrint('Logout berhasil. Semua sesi dan data lokal dihapus.');
+    } catch (e) {
+      // Tutup dialog loading jika ada error
+      if (mounted) {
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Gagal logout: ${e.toString()}'),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
           ),
-        ],
-      ),
-    );
+        );
+      }
+      debugPrint('Error saat logout: $e');
+    }
   }
+
 
   void _showAboutDialog() {
     showAboutDialog(
@@ -717,37 +546,11 @@ class _SettingsPageState extends State<SettingsPage>
         child: const Icon(Icons.business, color: Colors.white, size: 30),
       ),
       children: [
-        const Text(
-          'Aplikasi untuk kehadiran dan perizinan karyawan.',
-        ),
+        const Text('Aplikasi untuk kehadiran dan perizinan karyawan.'),
         const SizedBox(height: 16),
         const Text('Dikembangkan Tim Magang Politeknik Negeri Madiun.'),
       ],
     );
   }
 
-  void _showComingSoonDialog(String feature) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Row(
-          children: [
-            Icon(Icons.construction, color: Colors.orange.shade600),
-            const SizedBox(width: 8),
-            const Text('Segera Hadir'),
-          ],
-        ),
-        content: Text(
-          'Fitur $feature sedang dalam tahap pengembangan dan akan tersedia dalam update mendatang.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('OK'),
-          ),
-        ],
-      ),
-    );
-  }
 }

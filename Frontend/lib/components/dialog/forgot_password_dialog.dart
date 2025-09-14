@@ -23,11 +23,11 @@ class _ForgotPasswordDialogState extends State<ForgotPasswordDialog> {
       await FirebaseAuth.instance.sendPasswordResetEmail(email: email);
       Navigator.pop(context);
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Link reset password telah dikirim!")),
+        const SnackBar(content: Text('Link reset password telah dikirim!')),
       );
     } on FirebaseAuthException catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.message ?? "Gagal mengirim reset password")),
+        SnackBar(content: Text(e.message ?? 'Gagal mengirim reset password')),
       );
     } finally {
       setState(() => isSending = false);
@@ -49,12 +49,12 @@ class _ForgotPasswordDialogState extends State<ForgotPasswordDialog> {
               const Icon(Icons.lock_reset, size: 48, color: Colors.blue),
               const SizedBox(height: 16),
               const Text(
-                "Reset Password",
+                'Reset Password',
                 style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 12),
               const Text(
-                "Masukkan email akunmu dan kami akan mengirimkan link reset password ke email tersebut.",
+                'Masukkan email akunmu dan kami akan mengirimkan link reset password ke email tersebut.',
                 textAlign: TextAlign.center,
                 style: TextStyle(fontSize: 14, color: Colors.black54),
               ),
@@ -64,16 +64,16 @@ class _ForgotPasswordDialogState extends State<ForgotPasswordDialog> {
                 keyboardType: TextInputType.emailAddress,
                 validator: (value) {
                   if (value == null || value.trim().isEmpty) {
-                    return "Email wajib diisi";
+                    return 'Email wajib diisi';
                   }
                   final emailRegex = RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$');
                   if (!emailRegex.hasMatch(value.trim())) {
-                    return "Format email tidak valid";
+                    return 'Format email tidak valid';
                   }
                   return null;
                 },
                 decoration: InputDecoration(
-                  labelText: "Email",
+                  labelText: 'Email',
                   prefixIcon: const Icon(Icons.email_outlined),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
@@ -87,7 +87,7 @@ class _ForgotPasswordDialogState extends State<ForgotPasswordDialog> {
                 children: [
                   TextButton(
                     onPressed: isSending ? null : () => Navigator.pop(context),
-                    child: const Text("Batal"),
+                    child: const Text('Batal'),
                     style: TextButton.styleFrom(
                       foregroundColor: Colors.grey,
                     ),
@@ -105,7 +105,7 @@ class _ForgotPasswordDialogState extends State<ForgotPasswordDialog> {
                             ),
                           )
                         : const Icon(Icons.send),
-                    label: const Text("Kirim"),
+                    label: const Text('Kirim'),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.blue,
                       foregroundColor: const Color.fromARGB(187, 255, 255, 255),
