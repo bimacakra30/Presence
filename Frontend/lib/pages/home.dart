@@ -438,7 +438,7 @@ class _HomePageState extends State<HomePage> {
       builder: (BuildContext context) {
         return AlertDialog(
           title: const Text(
-            'Alasan Clock Out',
+            'Alasan Clock Out Awal',
             style: TextStyle(fontWeight: FontWeight.bold),
           ),
           content: TextField(
