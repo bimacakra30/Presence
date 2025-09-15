@@ -5,11 +5,14 @@ namespace App\Filament\Resources;
 use App\Filament\Resources\PresenceResource\Pages;
 use App\Filament\Resources\PresenceResource\RelationManagers;
 use App\Models\Presence;
+use App\Services\PresenceSyncService;
+use App\Services\FirestoreService;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
+use Filament\Notifications\Notification;
 use CloudinaryLabs\CloudinaryLaravel\Facades\Cloudinary;
 use Filament\Forms\Components\DatePicker;
 use Filament\Tables\Filters\Filter;
@@ -99,6 +102,40 @@ class PresenceResource extends Resource
     public static function table(Table $table): Table
     {
         return $table
+            ->headerActions([
+                Tables\Actions\Action::make('sync_presence')
+                    ->label('Sinkronisasi Data Presensi')
+                    ->icon('heroicon-o-arrow-path')
+                    ->color('warning')
+                    ->requiresConfirmation()
+                    ->modalHeading('Sinkronisasi Data Presensi')
+                    ->modalDescription('Apakah Anda yakin ingin melakukan sinkronisasi data presensi dari Firestore? Proses ini akan mengambil semua data presensi terbaru dari Firestore dan menyinkronkannya dengan database lokal.')
+                    ->modalSubmitActionLabel('Ya, Sinkronisasi')
+                    ->action(function () {
+                        try {
+                            $firestoreService = new FirestoreService();
+                            $presenceSyncService = new PresenceSyncService($firestoreService);
+                            
+                            // Jalankan sinkronisasi
+                            $result = $presenceSyncService->syncAllPresenceData(false);
+                            
+                            // Tampilkan notifikasi sukses
+                            Notification::make()
+                                ->title('Sinkronisasi Berhasil')
+                                ->body("Data presensi berhasil disinkronisasi: {$result['created']} data baru, {$result['updated']} data diperbarui, {$result['no_change']} data tidak berubah.")
+                                ->success()
+                                ->send();
+                                
+                        } catch (\Exception $e) {
+                            // Tampilkan notifikasi error
+                            Notification::make()
+                                ->title('Sinkronisasi Gagal')
+                                ->body('Terjadi kesalahan saat sinkronisasi data presensi: ' . $e->getMessage())
+                                ->danger()
+                                ->send();
+                        }
+                    })
+            ])
             ->columns([
                 Tables\Columns\TextColumn::make('nama')
                     ->searchable(),

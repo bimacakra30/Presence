@@ -35,32 +35,6 @@ class ListPresences extends ListRecords
     protected function getHeaderActions(): array
     {
         return [
-            Action::make('Muat Data Presensi')
-                ->icon('heroicon-m-arrow-path')
-                ->color('primary')
-                ->requiresConfirmation('Apakah Anda yakin ingin memuat ulang data presensi?')
-                ->modalHeading('Muat Ulang Data Presensi?')
-                ->modalSubheading('Ini akan menghapus data presensi yang ada dan menggantinya dengan data terbaru dari Firestore.')
-                ->modalButton('Muat Ulang')
-                ->action(function () {
-                    $service = new FirestoreService();
-                    $syncService = new \App\Services\ActivePresenceSyncService($service);
-                    
-                    // Use the proper sync service instead of manual updateOrCreate
-                    $results = $syncService->forceSync();
-                    
-                    $message = "Data presensi berhasil disinkronkan!\n";
-                    $message .= "Dibuat: {$results['created']}\n";
-                    $message .= "Diperbarui: {$results['updated']}\n";
-                    $message .= "Dilewati: {$results['skipped']}\n";
-                    $message .= "Error: {$results['errors']}";
-                    
-                    Notification::make()
-                        ->title('Data presensi berhasil disinkronkan!')
-                        ->body($message)
-                        ->success()
-                        ->send();
-                }),
             Action::make('export_excel')
                 ->label('Download Excel')
                 ->icon('heroicon-o-arrow-down-tray')

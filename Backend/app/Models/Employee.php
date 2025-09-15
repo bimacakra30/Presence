@@ -86,10 +86,11 @@ class Employee extends Model
 
                 // Simpan ke Firebase Auth dengan plain password
                 $auth = app('firebase.auth');
+                $password = $employee->plainPassword ?? 'defaultPassword123!'; // Default password jika null
                 $auth->createUser([
                     'uid' => $employee->uid,
                     'email' => $employee->email,
-                    'password' => $employee->plainPassword, // Gunakan plain password
+                    'password' => $password,
                     'displayName' => $employee->name,
                 ]);
 
